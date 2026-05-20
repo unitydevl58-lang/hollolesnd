@@ -74,7 +74,9 @@ public class SpeechInputManager : MonoBehaviour
 
     private void OnDestroy()
     {
+#if WINDOWS_UWP || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
         DestroyRecognizer();
+#endif
     }
 
     private void OnApplicationFocus(bool hasFocus)

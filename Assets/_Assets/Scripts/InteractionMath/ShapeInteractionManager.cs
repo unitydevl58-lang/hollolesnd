@@ -137,71 +137,40 @@ namespace HoloLensApp.Interaction.Math
 
         public static WongInteractionState ClassifyWongState(Bounds a, Bounds b)
         {
-            if (MathUtilities.AreCentersOverlapping(a.center, b.center))
-                return WongInteractionState.Coinciding;
-
-            float intersectionVolume = CalculateIntersectionVolume(a, b);
-            if (intersectionVolume > MathUtilities.Epsilon)
-                return WongInteractionState.Penetration;
-
-            if (BoundsAreTouching(a, b))
-                return WongInteractionState.Touching;
-
-            if (a.Intersects(b))
-                return WongInteractionState.Overlapping;
-
-            return WongInteractionState.Detachment;
+            FormalInteractionState formalState = WongMathUtility.DetectInteractionState(a, b);
+            switch (formalState)
+            {
+                case FormalInteractionState.Coinciding:
+                    return WongInteractionState.Coinciding;
+                case FormalInteractionState.Encapsulation:
+                case FormalInteractionState.Penetration:
+                    return WongInteractionState.Penetration;
+                case FormalInteractionState.Touching:
+                    return WongInteractionState.Touching;
+                case FormalInteractionState.Detachment:
+                default:
+                    return WongInteractionState.Detachment;
+            }
         }
 
         public static bool BoundsAreTouching(Bounds a, Bounds b)
         {
-            Vector3 delta = new Vector3(
-                Mathf.Max(0f, Mathf.Max(a.min.x - b.max.x, b.min.x - a.max.x)),
-                Mathf.Max(0f, Mathf.Max(a.min.y - b.max.y, b.min.y - a.max.y)),
-                Mathf.Max(0f, Mathf.Max(a.min.z - b.max.z, b.min.z - a.max.z)));
-
-            float separation = delta.magnitude;
-            return separation <= MathUtilities.Epsilon;
+            return WongMathUtility.DetectInteractionState(a, b, MathUtilities.Epsilon) == FormalInteractionState.Touching;
         }
 
         public static float CalculateUnionVolume(Bounds a, Bounds b)
         {
-            float volumeA = MathUtilities.CalculateVolume(a);
-            float volumeB = MathUtilities.CalculateVolume(b);
-            float intersectionVolume = CalculateIntersectionVolume(a, b);
-            return (volumeA + volumeB) - intersectionVolume;
+            return WongMathUtility.CalculateUnionVolume(a, b);
         }
 
         public static float CalculateIntersectionVolume(Bounds a, Bounds b)
         {
-            if (!a.Intersects(b))
-                return 0f;
-
-            float minX = Mathf.Max(a.min.x, b.min.x);
-            float minY = Mathf.Max(a.min.y, b.min.y);
-            float minZ = Mathf.Max(a.min.z, b.min.z);
-
-            float maxX = Mathf.Min(a.max.x, b.max.x);
-            float maxY = Mathf.Min(a.max.y, b.max.y);
-            float maxZ = Mathf.Min(a.max.z, b.max.z);
-
-            if (minX > maxX || minY > maxY || minZ > maxZ)
-                return 0f;
-
-            Vector3 size = new Vector3(maxX - minX, maxY - minY, maxZ - minZ);
-            Bounds intersectionBounds = new Bounds();
-            intersectionBounds.SetMinMax(
-                new Vector3(minX, minY, minZ),
-                new Vector3(maxX, maxY, maxZ));
-
-            return MathUtilities.CalculateVolume(intersectionBounds);
+            return WongMathUtility.CalculateIntersectionVolume(a, b);
         }
 
         public static float CalculateSubtractionVolume(Bounds main, Bounds subtractor)
         {
-            float mainVolume = MathUtilities.CalculateVolume(main);
-            float intersectionVolume = CalculateIntersectionVolume(main, subtractor);
-            return Mathf.Max(0f, mainVolume - intersectionVolume);
+            return WongMathUtility.CalculateSubtractionVolume(main, subtractor);
         }
 
         public void RequestCSG(GameObject objA, GameObject objB, CSGOperationType operation)

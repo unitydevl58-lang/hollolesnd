@@ -99,7 +99,7 @@ public class UIThemeController : MonoBehaviour
         if (listenButton != null)
         {
             listenButtonImage = listenButton.GetComponent<Image>();
-            StyleButton(listenButton, primaryAccent, textPrimary, "🎤");
+            StyleButton(listenButton, primaryAccent, textPrimary, "Dinle");
         }
 
         // Text elements
@@ -217,7 +217,7 @@ public class UIThemeController : MonoBehaviour
         TMP_Text label = listenButton != null
             ? listenButton.GetComponentInChildren<TMP_Text>() : null;
         if (label != null)
-            label.text = listening ? "⏹ Dur" : "🎤 Dinle";
+            label.text = listening ? "Dur" : "Dinle";
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

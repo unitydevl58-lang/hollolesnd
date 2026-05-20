@@ -29,6 +29,7 @@ namespace HoloLensApp.Core
         [SerializeField] private string mainMenuSceneName = "MainMenu_Scene";
 
         private bool _coreScenesLoaded;
+        private static bool _warnedMissingCoreScenes;
 
         private void Awake()
         {
@@ -57,6 +58,14 @@ namespace HoloLensApp.Core
         {
             if (_coreScenesLoaded)
                 yield break;
+
+            if (!CanLoadCoreSceneArchitecture())
+            {
+                WarnMissingCoreScenesOnce();
+                CoreManagersBootstrap.BootstrapManagers();
+                _coreScenesLoaded = true;
+                yield break;
+            }
 
             yield return LoadAdditiveIfMissing(SceneCoreXR);
             yield return LoadAdditiveIfMissing(SceneCoreManagers);
@@ -112,6 +121,22 @@ namespace HoloLensApp.Core
                 yield return null;
         }
 
+        private static bool CanLoadCoreSceneArchitecture()
+        {
+            return Application.CanStreamedLevelBeLoaded(SceneCoreXR) &&
+                   Application.CanStreamedLevelBeLoaded(SceneCoreManagers) &&
+                   Application.CanStreamedLevelBeLoaded(SceneEnvironment);
+        }
+
+        private static void WarnMissingCoreScenesOnce()
+        {
+            if (_warnedMissingCoreScenes)
+                return;
+
+            _warnedMissingCoreScenes = true;
+            Debug.LogWarning("[GameManager] Core additive scenes are not all in Build Settings; using in-scene/runtime manager bootstrap instead.");
+        }
+
         public void ExitGame()
         {
 #if UNITY_EDITOR
@@ -140,15 +165,31 @@ namespace HoloLensApp.Core
         {
             EnsureManager<SpatialAlignmentManager>("SpatialAlignmentManager");
             EnsureManager<CSGMaterialLibrary>("CSGMaterialLibrary");
-            EnsureManager<CSGFormManager>("CSGFormManager", go =>
-            {
-                if (go.GetComponent<PbCSGProvider>() == null)
-                    go.AddComponent<PbCSGProvider>();
-            });
+            EnsureCSGFormManager();
             EnsureManager<ShapeInteractionManager>("ShapeInteractionManager");
             EnsureManager<GeminiManager>("GeminiManager");
             EnsureManager<MRGrabController>("MRGrabController");
             EnsureManager<SpatialFormPipeline>("SpatialFormPipeline");
+        }
+
+        private static void EnsureCSGFormManager()
+        {
+            CSGFormManager existing = FindAnyObjectByType<CSGFormManager>();
+            if (existing != null)
+            {
+                ICSGProvider provider = existing.GetComponent<ICSGProvider>();
+                if (provider == null)
+                    provider = existing.gameObject.AddComponent<PbCSGProvider>();
+
+                existing.SetProvider(provider);
+                return;
+            }
+
+            GameObject go = new GameObject("CSGFormManager");
+            go.AddComponent<PbCSGProvider>();
+            go.AddComponent<CSGFormManager>();
+
+            DontDestroyOnLoad(go);
         }
 
         private static void EnsureManager<T>(string objectName, System.Action<GameObject> configure = null)

@@ -165,6 +165,14 @@ public class GeometryManager : MonoBehaviour
         }
 
         bool isSplitRequest = symbolicAnalysis != null && symbolicAnalysis.RequestsBinaryPartition;
+        if (isSplitRequest)
+        {
+            if (ShouldApplyPartitionToPreviousScene(symbolicAnalysis))
+                commands = CloneLastCommands();
+
+            ApplySymbolicPartitionHints(commands, symbolicAnalysis);
+        }
+
         bool hasMeaningfulPos = HasMeaningfulPositions(commands);
 
         // ── PATH 0: CSG BOOLEAN OPERATIONS ─────────────────────────────────────────

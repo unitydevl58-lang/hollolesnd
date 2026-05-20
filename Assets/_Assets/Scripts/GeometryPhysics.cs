@@ -13,14 +13,16 @@ public static class GeometryPhysics
     public static void Spawn(GameObject obj, Vector3 startPos, Vector3 targetPos, Vector3 targetScale)
     {
         if (obj == null) return;
-        
-        obj.transform.position = startPos;
-        obj.transform.localScale = Vector3.zero;
+
+        Transform transform = obj.transform;
+        transform.DOKill();
+        transform.position = startPos;
+        transform.localScale = Vector3.zero;
 
         // Smooth drop and bounce
-        obj.transform.DOMove(targetPos, 0.7f).SetEase(Ease.OutBounce);
+        transform.DOMove(targetPos, 0.7f).SetEase(Ease.OutBounce).SetLink(obj, LinkBehaviour.KillOnDestroy);
         // Pop in scale
-        obj.transform.DOScale(targetScale, 0.6f).SetEase(Ease.OutBack);
+        transform.DOScale(targetScale, 0.6f).SetEase(Ease.OutBack).SetLink(obj, LinkBehaviour.KillOnDestroy);
     }
 
     /// <summary>
@@ -30,8 +32,10 @@ public static class GeometryPhysics
     public static void Rearrange(GameObject obj, Vector3 targetPos)
     {
         if (obj == null) return;
-        
-        obj.transform.DOMove(targetPos, 0.8f).SetEase(Ease.InOutCubic);
+
+        Transform transform = obj.transform;
+        transform.DOKill();
+        transform.DOMove(targetPos, 0.8f).SetEase(Ease.InOutCubic).SetLink(obj, LinkBehaviour.KillOnDestroy);
     }
 
     /// <summary>
@@ -42,13 +46,15 @@ public static class GeometryPhysics
     {
         if (obj == null) return;
 
-        obj.transform.position = splitOrigin;
-        obj.transform.localScale = Vector3.zero;
+        Transform transform = obj.transform;
+        transform.DOKill();
+        transform.position = splitOrigin;
+        transform.localScale = Vector3.zero;
 
         float dist = Vector3.Distance(splitOrigin, targetPos);
         float jumpPower = Mathf.Clamp(dist * 0.5f, 0.5f, 2f);
 
-        obj.transform.DOJump(targetPos, jumpPower, 1, 0.7f).SetEase(Ease.OutQuad);
-        obj.transform.DOScale(targetScale, 0.6f).SetEase(Ease.OutBack);
+        transform.DOJump(targetPos, jumpPower, 1, 0.7f).SetEase(Ease.OutQuad).SetLink(obj, LinkBehaviour.KillOnDestroy);
+        transform.DOScale(targetScale, 0.6f).SetEase(Ease.OutBack).SetLink(obj, LinkBehaviour.KillOnDestroy);
     }
 }

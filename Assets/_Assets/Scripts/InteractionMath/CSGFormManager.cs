@@ -30,7 +30,7 @@ namespace HoloLensApp.Interaction.CSG
             _csgProvider = GetComponent<ICSGProvider>();
 
             if (_csgProvider == null)
-                Debug.LogWarning("[CSGFormManager] No ICSGProvider attached.");
+                _csgProvider = gameObject.AddComponent<PbCSGProvider>();
 
             if (materialLibrary == null)
                 materialLibrary = CSGMaterialLibrary.Instance ?? FindAnyObjectByType<CSGMaterialLibrary>();

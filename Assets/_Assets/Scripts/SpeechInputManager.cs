@@ -288,7 +288,7 @@ public class SpeechInputManager : MonoBehaviour
         if (label == null)
             return;
 
-        label.text = listening ? "⏹ Durdur" : "🎤 Dinle";
+        label.text = listening ? "Durdur" : "Dinle";
         listenButton.image.color = listening
             ? new Color(0.9f, 0.2f, 0.2f, 0.85f)
             : new Color(0.15f, 0.47f, 0.90f, 0.85f);

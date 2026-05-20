@@ -280,7 +280,7 @@ namespace Showcase.UI
             le.minHeight = 50f;
 
             // Title
-            var title = MakeLabel(header.transform, "TitleText", "⬡ DESIGN STUDIO HUB", 14f, 32f, layer);
+            var title = MakeLabel(header.transform, "TitleText", "DESIGN STUDIO HUB", 14f, 32f, layer);
             title.fontStyle = FontStyles.Bold;
             title.color = TXT_PRIMARY;
             title.alignment = TextAlignmentOptions.Center;
@@ -292,10 +292,10 @@ namespace Showcase.UI
             spacerLE.flexibleWidth = 1f;
 
             // Chat Toggle Button
-            var chatBtn = MakePillButton(header.transform, "💬 Chat Panel", ACCENT_NAV, ToggleChat, 10f, 100f, 32f, layer);
+            var chatBtn = MakePillButton(header.transform, "Chat Panel", ACCENT_NAV, ToggleChat, 10f, 100f, 32f, layer);
 
             // Close Button
-            var closeBtn = MakePillButton(header.transform, "✕ Kapat", ACCENT_CLOSE, HideHUD, 10f, 80f, 32f, layer);
+            var closeBtn = MakePillButton(header.transform, "Kapat", ACCENT_CLOSE, HideHUD, 10f, 80f, 32f, layer);
         }
 
         private void BuildNavRow(Transform parent, int layer)
@@ -311,9 +311,9 @@ namespace Showcase.UI
             var le = navRow.AddComponent<LayoutElement>();
             le.preferredHeight = BTN_H;
 
-            MakePillButton(navRow.transform, "🏠 Ana Menü (MainMenu)", ACCENT_NAV, () => LoadScene("MainMenu_Scene"), 11f, 200f, BTN_H, layer);
-            MakePillButton(navRow.transform, "🧱 Sandbox Sahnesi", ACCENT_SANDBOX, () => LoadScene("Sandbox_Scene"), 11f, 200f, BTN_H, layer);
-            MakePillButton(navRow.transform, "🎭 Showcase Sahnesi", ACCENT_SHOWCASE, () => LoadScene("Showcase_Scene"), 11f, 200f, BTN_H, layer);
+            MakePillButton(navRow.transform, "Ana Menü (MainMenu)", ACCENT_NAV, () => LoadScene("MainMenu_Scene"), 11f, 200f, BTN_H, layer);
+            MakePillButton(navRow.transform, "Sandbox Sahnesi", ACCENT_SANDBOX, () => LoadScene("Sandbox_Scene"), 11f, 200f, BTN_H, layer);
+            MakePillButton(navRow.transform, "Showcase Sahnesi", ACCENT_SHOWCASE, () => LoadScene("Showcase_Scene"), 11f, 200f, BTN_H, layer);
         }
 
         private GameObject BuildGroup(Transform parent, string labelText, Color borderAccent, (string label, System.Action action)[] buttons, int layer)
@@ -411,7 +411,7 @@ namespace Showcase.UI
             ifLE.flexibleWidth = 1f;
             ifLE.preferredHeight = BTN_H;
 
-            var sendBtn = MakePillButton(inputRow.transform, "Gönder ▶", ACCENT_SEND, SubmitChat, 11f, 90f, BTN_H, layer);
+            var sendBtn = MakePillButton(inputRow.transform, "Gönder", ACCENT_SEND, SubmitChat, 11f, 90f, BTN_H, layer);
 
             // Feedback area
             var feedbackGO = new GameObject("Feedback");

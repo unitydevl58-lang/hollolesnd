@@ -127,7 +127,7 @@ public class GeminiConnection : MonoBehaviour
         "  (b) The Ching principle + sub-principle and what it teaches.\n" +
         "  (c) The organization schema used.\n" +
         "\n" +
-        "PART 2 - JSON (after the text, inside ```json fences) — choose ONE of two formats:\n" +
+        "PART 2 - JSON (after the text, inside ```json fences) — choose ONE of these formats:\n" +
         "\n" +
         "FORMAT A — ADDING new objects to the scene (user asks to create, yap, oluştur, çiz, inşa et, ekle):\n" +
         "Output a plain JSON array containing ONLY the new objects.\n" +
@@ -149,7 +149,14 @@ public class GeminiConnection : MonoBehaviour
         "IMPORTANT: For 'touching', place object centers so they are exactly half their combined sizes apart. Two 1m cubes touching: centers 1.0m apart. A 1.5m leg touching a 0.1m thick table top: leg center at Y=0.75, top center at Y=1.55 (leg_half + top_half = 0.75+0.05=0.8m gap between centers... actually: leg top at Y=1.5, top bottom at Y=1.5, top center at Y=1.55).\n" +
         "IMPORTANT: Commands like 'yaklasır', 'daha yakın', 'birleştir', 'overlap', 'closer', 'move together', 'temas' — ALWAYS use FORMAT B (rebuildScene:true) with formInteraction='touching'.\n" +
         "\n" +
-        "FORMAT C — SPATIAL OPERATIONS (user asks to physically fragment, parçala, patlat, divide, shatter):\n" +
+        "FORMAT C — BINARY PARTITION (user asks 'ikiye böl', '2ye böl', 'divide into two', 'split in half', 'ayır'):\n" +
+        "Output normal ```json, NOT spatialop. Add a partition object so Unity builds two visible halves.\n" +
+        "```json\n" +
+        "[ { \"action\": \"create\", \"shape\": \"cube\", \"subdivision\": 1, \"color\": \"white\", \"position\": [0,0,0], \"scale\": [1,1,1], \"rotation\": [0,0,0], \"formInteraction\": \"detachment\", \"partition\": { \"enabled\": true, \"axis\": \"x\", \"gap\": 0.06 } } ]\n" +
+        "```\n" +
+        "If the user says only 'bunu ikiye böl' and [SCENE STATE] has an existing object, rebuild that existing object with partition enabled.\n" +
+        "\n" +
+        "FORMAT D — SPATIAL OPERATIONS (user asks to physically fragment, parçala, patlat, shatter, explode):\n" +
         "Output a spatialop JSON block targeting the object name or 'all' to fragment the whole scene.\n" +
         "```spatialop\n" +
         "{ \"operation\": \"fragmentation\", \"targetA\": \"all\" }\n" +
@@ -206,7 +213,7 @@ public class GeminiConnection : MonoBehaviour
         if (string.IsNullOrWhiteSpace(resultSummary)) return;
         string feedbackPrompt = $"[PHYSICS RESULT] {resultSummary}\n" +
             "Briefly acknowledge in Turkish and suggest next spatial operation (Wong principle).";
-        await ProcessPromptAsync(feedbackPrompt);
+        await ProcessPromptAsync(feedbackPrompt, applyGeometry: false);
     }
 
     /// <summary>
@@ -344,7 +351,7 @@ public class GeminiConnection : MonoBehaviour
     /// <summary>
     /// Coordinates cooldown, timeout, Gemini transport, and scene application.
     /// </summary>
-    private async Task ProcessPromptAsync(string userPrompt)
+    private async Task ProcessPromptAsync(string userPrompt, bool applyGeometry = true)
     {
         if (!CanStartRequest())
             return;
@@ -463,7 +470,18 @@ public class GeminiConnection : MonoBehaviour
                 }
             }
 
-            ApplyGeometryCommand(commandJson, symbolicAnalysis);
+            if (applyGeometry)
+            {
+                ApplyGeometryCommand(commandJson, symbolicAnalysis);
+            }
+            else
+            {
+                string feedback = ExtractFeedbackMessage(commandJson);
+                if (!string.IsNullOrEmpty(feedback) && feedbackText != null)
+                    feedbackText.text = feedback;
+
+                ShowStatus("");
+            }
         }
         catch (OperationCanceledException)
         {
@@ -495,6 +513,7 @@ public class GeminiConnection : MonoBehaviour
             geometryManager = geoObj.AddComponent<GeometryManager>();
         }
 
+        bool suppressSpatialOperation = ShouldSuppressSpatialOperation(commandJson, symbolicAnalysis);
         geometryManager.ProcessCommandJson(commandJson, symbolicAnalysis);
 
         // Show the Turkish mentor feedback (the text before the JSON block) in the Bilgi panel.
@@ -505,9 +524,24 @@ public class GeminiConnection : MonoBehaviour
         // ── LLM Spatial Operation Callback (SpatialFormPipeline dispatch) ──────
         // If the LLM appended a ```spatialop block, route it to SpatialFormPipeline.
         // This powers the AI-driven physics simulation pipeline.
-        LLMCallbackRouter.TryDispatch(commandJson);
+        if (!suppressSpatialOperation)
+            LLMCallbackRouter.TryDispatch(commandJson);
+        else
+            Debug.Log("[GeminiConnection] Ignored spatialop fragmentation because the prompt was detected as a binary split request.");
 
         ShowStatus("");
+    }
+
+    private static bool ShouldSuppressSpatialOperation(string response, SymbolicAnalysisResult symbolicAnalysis)
+    {
+        if (symbolicAnalysis == null || !symbolicAnalysis.RequestsBinaryPartition)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(response))
+            return false;
+
+        return response.IndexOf("```spatialop", StringComparison.OrdinalIgnoreCase) >= 0 &&
+               response.IndexOf("fragmentation", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     /// <summary>

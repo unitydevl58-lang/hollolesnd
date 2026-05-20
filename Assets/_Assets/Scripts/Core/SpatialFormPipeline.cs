@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 using HoloLensApp.Sandbox.Csg;
 
@@ -198,6 +199,14 @@ public class SpatialFormPipeline : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < transitionDuration)
         {
+            if (obj == null)
+            {
+                if (tempGhostMat != null)
+                    Destroy(tempGhostMat);
+
+                yield break;
+            }
+
             elapsed += Time.deltaTime;
             float t = Mathf.SmoothStep(0f, 1f, elapsed / transitionDuration);
             
@@ -222,6 +231,14 @@ public class SpatialFormPipeline : MonoBehaviour
             }
 
             yield return null;
+        }
+
+        if (obj == null)
+        {
+            if (tempGhostMat != null)
+                Destroy(tempGhostMat);
+
+            yield break;
         }
 
         // 4. Force target scale
@@ -460,6 +477,9 @@ public class SpatialFormPipeline : MonoBehaviour
 
         // Flash + destroy source
         yield return FlashObjects(new[] { source }, Color.white, 0.15f);
+        if (source != null)
+            source.transform.DOKill();
+
         Object.Destroy(source);
 
         // Build result string: positions of all fragments

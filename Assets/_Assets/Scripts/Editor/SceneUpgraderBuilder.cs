@@ -250,6 +250,7 @@ namespace HoloLensApp.Editor
         {
             XROrigin xrOrigin = EnsureXROrigin();
             Camera xrCamera = EnsureXRCamera(xrOrigin);
+            NormalizeXROriginForSimulation(xrOrigin);
 
             EnsureXRInteractionManager();
             EnsureEventSystemForXRUI();
@@ -299,6 +300,16 @@ namespace HoloLensApp.Editor
             xrOrigin.Camera = camera;
 
             return xrOrigin;
+        }
+
+        private static void NormalizeXROriginForSimulation(XROrigin xrOrigin)
+        {
+            if (xrOrigin == null)
+                return;
+
+            xrOrigin.CameraYOffset = 0f;
+            if (xrOrigin.CameraFloorOffsetObject != null)
+                xrOrigin.CameraFloorOffsetObject.transform.localPosition = Vector3.zero;
         }
 
         private static Camera EnsureXRCamera(XROrigin xrOrigin)
@@ -413,14 +424,19 @@ namespace HoloLensApp.Editor
                 managersRoot = new GameObject(ManagersRootName);
 
             EnsureComponent<ShapeInteractionManager>(managersRoot);
-            EnsureComponent<HoloLensApp.Core.GameManager>(managersRoot);
+            HoloLensApp.Core.GameManager gameManager = EnsureComponent<HoloLensApp.Core.GameManager>(managersRoot);
+            ConfigureGameManagerForSingleSceneUpgrade(gameManager);
+
             EnsureComponent<GeminiManager>(managersRoot);
-            EnsureComponent<GeminiConnection>(managersRoot);
+            GeminiConnection geminiConnection = EnsureComponent<GeminiConnection>(managersRoot);
             EnsureComponent<SpatialAlignmentManager>(managersRoot);
             EnsureComponent<CSGMaterialLibrary>(managersRoot);
-            EnsureComponent<CSGFormManager>(managersRoot);
-            EnsureComponent<PbCSGProvider>(managersRoot);
-            EnsureComponent<GeometryManager>(managersRoot);
+            PbCSGProvider csgProvider = EnsureComponent<PbCSGProvider>(managersRoot);
+            CSGFormManager csgFormManager = EnsureComponent<CSGFormManager>(managersRoot);
+            csgFormManager.SetProvider(csgProvider);
+
+            GeometryManager geometryManager = EnsureComponent<GeometryManager>(managersRoot);
+            WireGeminiConnection(geminiConnection, geometryManager);
             EnsureComponent<MRGrabController>(managersRoot);
             EnsureComponent<SpatialFormPipeline>(managersRoot);
 
@@ -428,6 +444,32 @@ namespace HoloLensApp.Editor
                 return 0;
 
             return UpgradePrimitiveColliderProps();
+        }
+
+        private static void ConfigureGameManagerForSingleSceneUpgrade(HoloLensApp.Core.GameManager gameManager)
+        {
+            if (gameManager == null)
+                return;
+
+            SerializedObject serializedObject = new SerializedObject(gameManager);
+            SerializedProperty autoLoadProperty = serializedObject.FindProperty("autoLoadCoreScenesOnStart");
+            if (autoLoadProperty != null)
+                autoLoadProperty.boolValue = false;
+
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void WireGeminiConnection(GeminiConnection geminiConnection, GeometryManager geometryManager)
+        {
+            if (geminiConnection == null || geometryManager == null)
+                return;
+
+            SerializedObject serializedObject = new SerializedObject(geminiConnection);
+            SerializedProperty geometryProperty = serializedObject.FindProperty("geometryManager");
+            if (geometryProperty != null)
+                geometryProperty.objectReferenceValue = geometryManager;
+
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static int UpgradePrimitiveColliderProps()

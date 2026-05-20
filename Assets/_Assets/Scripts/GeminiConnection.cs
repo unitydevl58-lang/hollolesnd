@@ -97,8 +97,8 @@ public class GeminiConnection : MonoBehaviour
         "- 'overlapping' : Ortusme - one form visually covers part of another (top-bottom). Use rotation+position.\n" +
         "- 'penetration' : Ice Girme - both forms fully visible, boundaries cross, no priority. Overlap positions.\n" +
         "- 'union'       : Birlesme - forms merge into one larger mass. Position them flush/adjacent.\n" +
-        "- 'subtraction' : Eksilme - VISUAL ONLY (no real CSG). Use contrasting small object to imply removal.\n" +
-        "- 'intersection': Kesisme - VISUAL ONLY. Add a small contrasting object at the crossing zone.\n" +
+        "- 'subtraction' : Eksilme - runtime CSG subtraction (carved mesh, acetate material).\n" +
+        "- 'intersection': Kesisme - runtime CSG intersection (shared volume mesh, white material).\n" +
         "- 'coinciding'  : Denk Gelme - identical position, forms read as one. Use slightly different colors.\n" +
         "\n" +
         "=== 4. CHING (2014) - 6 DESIGN PRINCIPLES ===\n" +

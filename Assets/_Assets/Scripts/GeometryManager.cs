@@ -7,6 +7,10 @@ using Newtonsoft.Json.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Serialization;
+using DG.Tweening;
+using HoloLensApp.Interaction.Snapping;
+using HoloLensApp.Interaction.CSG;
+using HoloLensApp.Interaction.Math;
 
 /// <summary>
 /// Engine-friendly representation of a single object request from Gemini.
@@ -162,6 +166,16 @@ public class GeometryManager : MonoBehaviour
 
         bool isSplitRequest = symbolicAnalysis != null && symbolicAnalysis.RequestsBinaryPartition;
         bool hasMeaningfulPos = HasMeaningfulPositions(commands);
+
+        // ── PATH 0: CSG BOOLEAN OPERATIONS ─────────────────────────────────────────
+        foreach (DesignCommand command in commands)
+        {
+            if (command != null && IsCSGAction(command.Action))
+            {
+                ExecuteCSGAction(command.Action);
+                return;
+            }
+        }
 
         // ── PATH 2: REBUILD — animate existing objects to new positions ──────────
         if (_pendingRebuild)
@@ -507,6 +521,10 @@ public class GeometryManager : MonoBehaviour
         if (root == null)
             return;
 
+        // Kill all active DOTween animations to prevent MissingReferenceExceptions
+        // when the objects they are animating are destroyed below.
+        DOTween.KillAll();
+
         // Destroy every child. The root itself stays alive so subsequent
         // ProcessCommandJson calls can still Find() it and parent new objects to it.
         for (int i = root.transform.childCount - 1; i >= 0; i--)
@@ -566,6 +584,9 @@ public class GeometryManager : MonoBehaviour
         grab.throwOnDetach = true;
         grab.throwVelocityScale = 2.0f;
 
+        group.AddComponent<HoloLensApp.Interaction.Math.FormInteractable>();
+        group.AddComponent<HoloLensApp.Interaction.Snapping.GridSnapper>();
+
         // Physics spawn: drop from 0.25m above with spring-bounce.
         float   delay      = spawnIndex * 0.12f;
         Vector3 finalPos   = group.transform.position;
@@ -575,9 +596,6 @@ public class GeometryManager : MonoBehaviour
             StartCoroutine(DelayedPhysicsSpawn(group, spawnStart, finalPos, objectScaleVector, delay));
         else
             GeometryPhysics.Spawn(group, spawnStart, finalPos, objectScaleVector);
-
-        // Release Kinematic so they drop and can be physically grabbed!
-        StartCoroutine(ReleaseKinematicAfterSpawn(rb, 1.5f + delay));
 
         // ── AI-driven visual build-in: ghost material scale-up over DOTween spawn ──
         // SpatialFormPipeline.AnimatedInstantiate plays over the existing bounce.
@@ -1183,9 +1201,27 @@ public class GeometryManager : MonoBehaviour
         if (renderer != null)
             renderer.sharedMaterial = material;
 
-        Collider collider = voxel.GetComponent<Collider>();
-        if (collider != null)
-            Destroy(collider);
+        // DO NOT DESTROY THE COLLIDER! We need it for CSG and XR Grabbing.
+        // Collider collider = voxel.GetComponent<Collider>();
+        // if (collider != null)
+        //    Destroy(collider);
+        
+        // ── XR Interaction & Snapping Additions ──
+        // Add physics and interaction to EACH voxel so the user can grab them individually!
+        var rb = voxel.AddComponent<Rigidbody>();
+        rb.isKinematic = false;
+        rb.useGravity = false; // Floating in space
+        rb.mass = 1f;
+        rb.linearDamping = 5f;
+        rb.angularDamping = 5f;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
+        var grab = voxel.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+        grab.movementType = UnityEngine.XR.Interaction.Toolkit.Interactables.XRBaseInteractable.MovementType.Kinematic;
+        grab.throwOnDetach = true;
+        grab.throwVelocityScale = 2.0f;
+
+        // Grid snap is applied at the parent group level (GridSnapper), not per-voxel.
     }
 
     /// <summary>
@@ -1318,6 +1354,49 @@ public class GeometryManager : MonoBehaviour
             || normalized == "make"
             || normalized == "spawn"
             || normalized == "olustur";
+    }
+
+    private bool IsCSGAction(string action)
+    {
+        string normalized = NormalizeText(action);
+        return normalized == "intersect" || normalized == "kes" || normalized == "kesisim" ||
+               normalized == "union" || normalized == "birlestir" || normalized == "merge" ||
+               normalized == "subtract" || normalized == "cikar" || normalized == "fark";
+    }
+
+    private void ExecuteCSGAction(string action)
+    {
+        GameObject root = GameObject.Find(sceneRootName);
+        if (root == null || root.transform.childCount < 2)
+        {
+            ShowError("Sahne'de islem yapacak en az 2 obje bulunamadi!");
+            return;
+        }
+
+        // Just grab the first two children for the demo.
+        // In a more complex setup, you could find the intersecting ones using Physics.OverlapBox.
+        GameObject objA = root.transform.GetChild(0).gameObject;
+        GameObject objB = root.transform.GetChild(1).gameObject;
+
+        CSGOperationType op = CSGOperationType.Subtraction;
+        string normalized = NormalizeText(action);
+        if (normalized == "intersect" || normalized == "kes" || normalized == "kesisim") op = CSGOperationType.Intersection;
+        if (normalized == "union" || normalized == "birlestir" || normalized == "merge") op = CSGOperationType.Union;
+
+        if (ShapeInteractionManager.Instance != null)
+        {
+            ShapeInteractionManager.Instance.RequestCSG(objA, objB, op);
+            Debug.Log($"[GeometryManager] CSG Operation {op} dispatched via ShapeInteractionManager.");
+        }
+        else if (CSGFormManager.Instance != null)
+        {
+            CSGFormManager.Instance.ProcessCSGOperation(objA, objB, op);
+            Debug.Log($"[GeometryManager] CSG Operation {op} started via CSGFormManager.");
+        }
+        else
+        {
+            Debug.LogError("[GeometryManager] No CSG pipeline available (ShapeInteractionManager / CSGFormManager).");
+        }
     }
 
     private bool IsPartitionEnabled(JToken token)

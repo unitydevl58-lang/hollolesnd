@@ -6,6 +6,15 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/_Assets/Scenes/Core_XR_Setup.unity
+    guid: c819a3f2ac195c54e96f31883bfb3d4f
+  - enabled: 1
+    path: Assets/_Assets/Scenes/Core_Managers.unity
+    guid: 41c2d73231cfa3848a49045c22af18eb
+  - enabled: 1
+    path: Assets/_Assets/Scenes/Environment_And_Logic.unity
+    guid: cde951418fbe4ef4eac8feaa94f3408c
+  - enabled: 1
     path: Assets/_Assets/Scenes/MainMenu_Scene.unity
     guid: e0d511fad2da534459b2a390aab87aa3
   - enabled: 1

@@ -11,6 +11,16 @@ namespace Showcase.Editor
 {
     public class AppSetupMenu : MonoBehaviour
     {
+        private const string MainMenuScenePath = "Assets/_Assets/Scenes/MainMenu_Scene.unity";
+
+        private static readonly Color PastelPanelColor = new Color(0.984f, 0.973f, 0.992f, 0.94f);
+        private static readonly Color PastelHeaderColor = new Color(0.965f, 0.949f, 0.984f, 0.96f);
+        private static readonly Color PastelMintColor = new Color(0.635f, 0.835f, 0.776f, 1f);
+        private static readonly Color PastelSalmonColor = new Color(0.957f, 0.643f, 0.573f, 1f);
+        private static readonly Color PastelCoralColor = new Color(1f, 0.478f, 0.486f, 1f);
+        private static readonly Color PastelTextColor = new Color(0.29f, 0.282f, 0.298f, 1f);
+        private static readonly Color PastelMutedTextColor = new Color(0.56f, 0.535f, 0.59f, 1f);
+
         [MenuItem("Showcase/Setup App Architecture")]
         public static void SetupAppArchitecture()
         {
@@ -103,7 +113,7 @@ namespace Showcase.Editor
             GameObject panelObj = new GameObject("BackgroundPanel");
             panelObj.transform.SetParent(canvasObj.transform, false);
             Image panelImg = panelObj.AddComponent<Image>();
-            panelImg.color = new Color(0.98f, 0.98f, 0.96f, 0.9f); // Soft cream/white translucent
+            panelImg.color = PastelPanelColor;
             RectTransform panelRect = panelObj.GetComponent<RectTransform>();
             panelRect.anchorMin = Vector2.zero;
             panelRect.anchorMax = Vector2.one;
@@ -113,27 +123,30 @@ namespace Showcase.Editor
             GameObject titleObj = new GameObject("TitleText");
             titleObj.transform.SetParent(canvasObj.transform, false);
             TextMeshProUGUI titleText = titleObj.AddComponent<TextMeshProUGUI>();
-            titleText.text = "ISAS 2018 SHOWCASE";
-            titleText.fontSize = 60;
-            titleText.color = new Color(0.2f, 0.3f, 0.3f); // Dark teal/gray
+            titleText.text = "DESIGN STUDIO HUB";
+            titleText.fontSize = 54;
+            titleText.fontStyle = FontStyles.Bold;
+            titleText.color = PastelTextColor;
             titleText.alignment = TextAlignmentOptions.Center;
             RectTransform titleRect = titleObj.GetComponent<RectTransform>();
-            titleRect.anchoredPosition = new Vector2(0, 200);
+            titleRect.anchoredPosition = new Vector2(0, 210);
             titleRect.sizeDelta = new Vector2(800, 100);
 
             // Controller Script
             MainMenuController controller = canvasObj.AddComponent<MainMenuController>();
 
             // Create Buttons
-            CreateStyledButton(canvasObj.transform, "Sergiyi Başlat", new Vector2(0, 50), () => {
+            CreateStyledButton(canvasObj.transform, "Sergiyi Başlat", new Vector2(-300, 25), () => {
                 UnityEditor.Events.UnityEventTools.AddPersistentListener(canvasObj.GetComponentInChildren<Button>().onClick, controller.LoadShowcaseScene);
-            });
-            CreateStyledButton(canvasObj.transform, "Sandbox Modu", new Vector2(0, -50), () => {
+            }, PastelSalmonColor);
+            CreateStyledButton(canvasObj.transform, "Sandbox Modu", new Vector2(0, 25), () => {
                 UnityEditor.Events.UnityEventTools.AddPersistentListener(canvasObj.GetComponentsInChildren<Button>()[1].onClick, controller.LoadSandboxScene);
-            });
-            CreateStyledButton(canvasObj.transform, "Çıkış", new Vector2(0, -150), () => {
+            }, PastelMintColor);
+            CreateStyledButton(canvasObj.transform, "Çıkış", new Vector2(300, 25), () => {
                 UnityEditor.Events.UnityEventTools.AddPersistentListener(canvasObj.GetComponentsInChildren<Button>()[2].onClick, controller.QuitApplication);
-            });
+            }, PastelCoralColor);
+
+            StyleMainMenuCanvas(canvasObj);
         }
 
         private static void CreateStyledButton(Transform parent, string labelText, Vector2 anchoredPosition, System.Action onCreated, Color? overrideColor = null)
@@ -141,11 +154,11 @@ namespace Showcase.Editor
             GameObject btnObj = new GameObject($"Button_{labelText}");
             btnObj.transform.SetParent(parent, false);
             RectTransform btnRect = btnObj.AddComponent<RectTransform>();
-            btnRect.sizeDelta = new Vector2(400, 80);
+            btnRect.sizeDelta = new Vector2(280, 78);
             btnRect.anchoredPosition = anchoredPosition;
 
             Image btnImg = btnObj.AddComponent<Image>();
-            Color baseColor = overrideColor ?? new Color(0.85f, 0.92f, 0.95f, 1f); // Pastel Blue default
+            Color baseColor = overrideColor ?? PastelMintColor;
             btnImg.color = baseColor; 
 
             Button btn = btnObj.AddComponent<Button>();
@@ -160,8 +173,9 @@ namespace Showcase.Editor
             textObj.transform.SetParent(btnObj.transform, false);
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = labelText;
-            tmp.fontSize = 32;
-            tmp.color = new Color(0.2f, 0.2f, 0.2f); // Dark gray text
+            tmp.fontSize = 26;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.color = GetReadableButtonTextColor(baseColor);
             tmp.alignment = TextAlignmentOptions.Center;
             RectTransform textRect = textObj.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
@@ -169,6 +183,231 @@ namespace Showcase.Editor
             textRect.sizeDelta = Vector2.zero;
 
             onCreated?.Invoke();
+        }
+
+        [MenuItem("Showcase/Apply Pastel Main Menu Style")]
+        public static void ApplyPastelMainMenuStyle()
+        {
+            Scene scene = EditorSceneManager.GetActiveScene();
+            if (!scene.IsValid() || !scene.name.Contains("MainMenu"))
+            {
+                if (!System.IO.File.Exists(MainMenuScenePath))
+                {
+                    Debug.LogError($"[AppSetup] Main menu scene not found at {MainMenuScenePath}.");
+                    return;
+                }
+
+                scene = EditorSceneManager.OpenScene(MainMenuScenePath, OpenSceneMode.Single);
+            }
+
+            GameObject canvasObj = GameObject.Find("MainMenu_Canvas");
+            if (canvasObj == null)
+            {
+                CreateMainMenuUI();
+                canvasObj = GameObject.Find("MainMenu_Canvas");
+            }
+
+            if (canvasObj == null)
+            {
+                Debug.LogError("[AppSetup] Could not create or find MainMenu_Canvas.");
+                return;
+            }
+
+            StyleMainMenuCanvas(canvasObj);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[AppSetup] Pastel Main Menu style applied to {scene.path}.");
+        }
+
+        private static void StyleMainMenuCanvas(GameObject canvasObj)
+        {
+            RectTransform canvasRect = canvasObj.GetComponent<RectTransform>();
+            if (canvasRect != null)
+            {
+                canvasRect.sizeDelta = new Vector2(980f, 620f);
+            }
+
+            canvasObj.transform.position = new Vector3(0f, 1.2f, 1.5f);
+            canvasObj.transform.localScale = new Vector3(0.002f, 0.002f, 0.002f);
+
+            Canvas canvas = canvasObj.GetComponent<Canvas>();
+            if (canvas != null)
+            {
+                canvas.renderMode = RenderMode.WorldSpace;
+                canvas.sortingOrder = 20;
+            }
+
+            GameObject panelObj = EnsureChild(canvasObj.transform, "BackgroundPanel");
+            panelObj.transform.SetSiblingIndex(0);
+            ConfigureImagePanel(panelObj, PastelPanelColor, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            ConfigureShadow(panelObj, new Color(0f, 0f, 0f, 0.16f), new Vector2(0f, -12f));
+
+            GameObject headerObj = EnsureChild(canvasObj.transform, "HeaderPanel");
+            headerObj.transform.SetSiblingIndex(1);
+            ConfigureImagePanel(headerObj, PastelHeaderColor, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -64f), new Vector2(860f, 82f));
+
+            TextMeshProUGUI titleText = EnsureText(canvasObj.transform, "TitleText");
+            titleText.text = "DESIGN STUDIO HUB";
+            titleText.fontSize = 40f;
+            titleText.fontStyle = FontStyles.Bold;
+            titleText.characterSpacing = 0f;
+            titleText.color = PastelTextColor;
+            titleText.alignment = TextAlignmentOptions.Left;
+            RectTransform titleRect = titleText.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.5f, 1f);
+            titleRect.anchorMax = new Vector2(0.5f, 1f);
+            titleRect.anchoredPosition = new Vector2(-228f, -64f);
+            titleRect.sizeDelta = new Vector2(420f, 64f);
+
+            TextMeshProUGUI subtitleText = EnsureText(canvasObj.transform, "SubtitleText");
+            subtitleText.text = "Ana Menü";
+            subtitleText.fontSize = 24f;
+            subtitleText.fontStyle = FontStyles.Bold;
+            subtitleText.color = PastelMutedTextColor;
+            subtitleText.alignment = TextAlignmentOptions.Center;
+            RectTransform subtitleRect = subtitleText.GetComponent<RectTransform>();
+            subtitleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            subtitleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            subtitleRect.anchoredPosition = new Vector2(0f, 116f);
+            subtitleRect.sizeDelta = new Vector2(540f, 50f);
+
+            ConfigureMainMenuButton(canvasObj.transform, "Button_Sandbox Modu", "Sandbox Modu", new Vector2(-300f, 10f), PastelMintColor);
+            ConfigureMainMenuButton(canvasObj.transform, "Button_Sergiyi Başlat", "Sergiyi Başlat", new Vector2(0f, 10f), PastelSalmonColor);
+            ConfigureMainMenuButton(canvasObj.transform, "Button_Çıkış", "Çıkış", new Vector2(300f, 10f), PastelCoralColor);
+        }
+
+        private static GameObject EnsureChild(Transform parent, string name)
+        {
+            Transform existing = parent.Find(name);
+            if (existing != null)
+            {
+                return existing.gameObject;
+            }
+
+            GameObject child = new GameObject(name);
+            child.transform.SetParent(parent, false);
+            return child;
+        }
+
+        private static TextMeshProUGUI EnsureText(Transform parent, string name)
+        {
+            GameObject textObj = EnsureChild(parent, name);
+            TextMeshProUGUI text = textObj.GetComponent<TextMeshProUGUI>();
+            if (text == null)
+            {
+                text = textObj.AddComponent<TextMeshProUGUI>();
+            }
+
+            return text;
+        }
+
+        private static void ConfigureImagePanel(GameObject obj, Color color, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPosition, Vector2 sizeDelta)
+        {
+            RectTransform rect = obj.GetComponent<RectTransform>();
+            if (rect == null)
+            {
+                rect = obj.AddComponent<RectTransform>();
+            }
+
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = sizeDelta;
+
+            Image image = obj.GetComponent<Image>();
+            if (image == null)
+            {
+                image = obj.AddComponent<Image>();
+            }
+
+            image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            image.type = Image.Type.Sliced;
+            image.color = color;
+            image.raycastTarget = false;
+        }
+
+        private static void ConfigureMainMenuButton(Transform parent, string objectName, string label, Vector2 anchoredPosition, Color baseColor)
+        {
+            GameObject buttonObj = EnsureChild(parent, objectName);
+            RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
+            if (buttonRect == null)
+            {
+                buttonRect = buttonObj.AddComponent<RectTransform>();
+            }
+
+            buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
+            buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
+            buttonRect.anchoredPosition = anchoredPosition;
+            buttonRect.sizeDelta = new Vector2(270f, 78f);
+
+            Image image = buttonObj.GetComponent<Image>();
+            if (image == null)
+            {
+                image = buttonObj.AddComponent<Image>();
+            }
+
+            image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            image.type = Image.Type.Sliced;
+            image.color = baseColor;
+            image.raycastTarget = true;
+            ConfigureShadow(buttonObj, new Color(0f, 0f, 0f, 0.18f), new Vector2(0f, -6f));
+
+            Button button = buttonObj.GetComponent<Button>();
+            if (button == null)
+            {
+                button = buttonObj.AddComponent<Button>();
+            }
+
+            ColorBlock colors = button.colors;
+            colors.normalColor = baseColor;
+            colors.highlightedColor = LightenColor(baseColor, 1.08f);
+            colors.pressedColor = DarkenColor(baseColor, 0.88f);
+            colors.selectedColor = LightenColor(baseColor, 1.04f);
+            colors.disabledColor = new Color(baseColor.r, baseColor.g, baseColor.b, 0.45f);
+            colors.fadeDuration = 0.08f;
+            button.colors = colors;
+            button.targetGraphic = image;
+
+            TextMeshProUGUI labelText = EnsureText(buttonObj.transform, "Text");
+            labelText.text = label;
+            labelText.fontSize = 24f;
+            labelText.fontStyle = FontStyles.Bold;
+            labelText.color = GetReadableButtonTextColor(baseColor);
+            labelText.alignment = TextAlignmentOptions.Center;
+            RectTransform textRect = labelText.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.anchoredPosition = Vector2.zero;
+            textRect.sizeDelta = Vector2.zero;
+        }
+
+        private static void ConfigureShadow(GameObject obj, Color color, Vector2 distance)
+        {
+            Shadow shadow = obj.GetComponent<Shadow>();
+            if (shadow == null)
+            {
+                shadow = obj.AddComponent<Shadow>();
+            }
+
+            shadow.effectColor = color;
+            shadow.effectDistance = distance;
+            shadow.useGraphicAlpha = true;
+        }
+
+        private static Color GetReadableButtonTextColor(Color baseColor)
+        {
+            float luminance = (baseColor.r * 0.299f) + (baseColor.g * 0.587f) + (baseColor.b * 0.114f);
+            return luminance > 0.72f ? PastelTextColor : Color.white;
+        }
+
+        private static Color LightenColor(Color color, float multiplier)
+        {
+            return new Color(Mathf.Clamp01(color.r * multiplier), Mathf.Clamp01(color.g * multiplier), Mathf.Clamp01(color.b * multiplier), color.a);
+        }
+
+        private static Color DarkenColor(Color color, float multiplier)
+        {
+            return new Color(color.r * multiplier, color.g * multiplier, color.b * multiplier, color.a);
         }
 
         [MenuItem("Showcase/Inject MR Interaction Setup")]

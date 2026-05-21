@@ -57,7 +57,7 @@ namespace Showcase.UI
         static readonly Color TXT_ERROR     = new Color(1.000f, 0.350f, 0.380f, 1f);
 
         private const float PANEL_WIDTH  = 1100f;
-        private const float PANEL_HEIGHT = 980f;
+        private const float PANEL_HEIGHT = 1080f;
         private const float INFO_CARD_WIDTH = 320f;
         private const float INFO_CARD_HEIGHT = 280f;
         private const float INFO_CARD_GAP = 6f;
@@ -389,7 +389,7 @@ namespace Showcase.UI
             vLayout.childForceExpandHeight = false;
 
             var cpLE = _chatPanel.AddComponent<LayoutElement>();
-            cpLE.preferredHeight = 430f; // Rigid height for chat container + keyboard
+            cpLE.preferredHeight = 500f; // Rigid height for full-width keyboard
 
             // Status label
             _chatStatus = MakeLabel(_chatPanel.transform, "ChatStatus", "LLM Bağlantısı Aktif", 16f, 24f, layer);
@@ -411,6 +411,9 @@ namespace Showcase.UI
 
             var inputField = MakeInputField(inputRow.transform, "Input", layer);
             _chatInput = inputField.GetComponent<TMP_InputField>();
+            _chatInput.readOnly = true;
+            _chatInput.shouldHideMobileInput = true;
+            _chatInput.shouldHideSoftKeyboard = true;
             _chatInput.onSubmit.AddListener(_ => SubmitChat());
             var ifLE = inputField.AddComponent<LayoutElement>();
             ifLE.flexibleWidth = 1f;
@@ -468,15 +471,15 @@ namespace Showcase.UI
             keyboard.layer = layer;
 
             var layout = keyboard.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 8f;
+            layout.spacing = 10f;
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
+            layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
             var le = keyboard.AddComponent<LayoutElement>();
-            le.preferredHeight = 240f;
+            le.preferredHeight = 326f;
 
             BuildKeyboardLetterRow(keyboard.transform, "1234567890", layer);
             BuildKeyboardLetterRow(keyboard.transform, "QWERTYUIOPĞÜ", layer);
@@ -487,21 +490,22 @@ namespace Showcase.UI
 
         private void BuildKeyboardLetterRow(Transform parent, string letters, int layer)
         {
-            var row = MakeKeyboardRow(parent, $"KeyboardRow_{letters}", layer, 40f);
+            var row = MakeKeyboardRow(parent, $"KeyboardRow_{letters}", layer, 56f);
             for (int i = 0; i < letters.Length; i++)
             {
                 string letter = letters[i].ToString();
-                MakePillButton(row.transform, letter, BG_KEY, () => AppendKeyboardText(letter), 14f, 42f, 40f, layer);
+                GameObject key = MakePillButton(row.transform, letter, BG_KEY, () => AppendKeyboardText(letter), 20f, 56f, 56f, layer);
+                ConfigureFlexibleKey(key, 1f, 52f);
             }
         }
 
         private void BuildKeyboardActionRow(Transform parent, int layer)
         {
-            var row = MakeKeyboardRow(parent, "KeyboardRow_Actions", layer, 48f);
-            MakePillButton(row.transform, "Boşluk", ACCENT_NAV, () => AppendKeyboardText(" "), 14f, 210f, 48f, layer);
-            MakePillButton(row.transform, "Sil", ACCENT_CLOSE, BackspaceKeyboardText, 14f, 104f, 48f, layer);
-            MakePillButton(row.transform, "Temizle", ACCENT_NAV, ClearKeyboardText, 14f, 142f, 48f, layer);
-            MakePillButton(row.transform, "Gönder", ACCENT_SEND, SubmitChat, 14f, 142f, 48f, layer);
+            var row = MakeKeyboardRow(parent, "KeyboardRow_Actions", layer, 60f);
+            ConfigureFlexibleKey(MakePillButton(row.transform, "Boşluk", ACCENT_NAV, () => AppendKeyboardText(" "), 17f, 210f, 60f, layer), 2.2f, 180f);
+            ConfigureFlexibleKey(MakePillButton(row.transform, "Sil", ACCENT_CLOSE, BackspaceKeyboardText, 17f, 104f, 60f, layer), 1f, 96f);
+            ConfigureFlexibleKey(MakePillButton(row.transform, "Temizle", ACCENT_NAV, ClearKeyboardText, 17f, 142f, 60f, layer), 1.4f, 128f);
+            ConfigureFlexibleKey(MakePillButton(row.transform, "Gönder", ACCENT_SEND, SubmitChat, 17f, 142f, 60f, layer), 1.4f, 128f);
         }
 
         private GameObject MakeKeyboardRow(Transform parent, string name, int layer, float height)
@@ -511,16 +515,29 @@ namespace Showcase.UI
             row.layer = layer;
 
             var layout = row.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 8f;
+            layout.spacing = 10f;
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
+            layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
             var le = row.AddComponent<LayoutElement>();
             le.preferredHeight = height;
             return row;
+        }
+
+        private static void ConfigureFlexibleKey(GameObject key, float flexibleWidth, float minWidth)
+        {
+            if (key == null)
+                return;
+
+            LayoutElement layout = key.GetComponent<LayoutElement>();
+            if (layout == null)
+                layout = key.AddComponent<LayoutElement>();
+
+            layout.minWidth = minWidth;
+            layout.flexibleWidth = flexibleWidth;
         }
 
         private void AppendKeyboardText(string value)
@@ -530,7 +547,7 @@ namespace Showcase.UI
 
             _chatInput.text = (_chatInput.text ?? string.Empty) + value;
             _chatInput.caretPosition = _chatInput.text.Length;
-            _chatInput.ActivateInputField();
+            _chatInput.ForceLabelUpdate();
         }
 
         private void BackspaceKeyboardText()
@@ -540,7 +557,7 @@ namespace Showcase.UI
 
             _chatInput.text = _chatInput.text.Remove(_chatInput.text.Length - 1, 1);
             _chatInput.caretPosition = _chatInput.text.Length;
-            _chatInput.ActivateInputField();
+            _chatInput.ForceLabelUpdate();
         }
 
         private void ClearKeyboardText()
@@ -549,7 +566,7 @@ namespace Showcase.UI
                 return;
 
             _chatInput.text = string.Empty;
-            _chatInput.ActivateInputField();
+            _chatInput.ForceLabelUpdate();
         }
 
         #endregion
@@ -569,7 +586,7 @@ namespace Showcase.UI
             SetChatStatus("LLM'e gönderiliyor...");
             string text = _chatInput.text;
             _chatInput.text = "";
-            _chatInput.ActivateInputField();
+            _chatInput.ForceLabelUpdate();
             gemini.SubmitFromHUD(text);
         }
 

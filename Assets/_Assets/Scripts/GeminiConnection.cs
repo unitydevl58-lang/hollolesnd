@@ -353,7 +353,13 @@ public class GeminiConnection : MonoBehaviour
     /// </summary>
     private async Task ProcessPromptAsync(string userPrompt, bool applyGeometry = true)
     {
-        if (!CanStartRequest())
+        string normalizedPrompt = NormalizeUserPrompt(userPrompt);
+        SymbolicAnalysisResult symbolicAnalysis = new KeywordSymbolicInputAnalyzer().Analyze(normalizedPrompt);
+        string promptKey = TextNormalizer.NormalizeKey(normalizedPrompt);
+        bool bypassCooldown = applyGeometry &&
+                              (IsResetCommand(normalizedPrompt) || IsLocalSpatialCommandCandidate(promptKey, symbolicAnalysis));
+
+        if (!bypassCooldown && !CanStartRequest())
             return;
 
         string resolvedApiKey = ResolveApiKey();
@@ -366,8 +372,6 @@ public class GeminiConnection : MonoBehaviour
             cancellationSource = new CancellationTokenSource();
             cancellationSource.CancelAfter(TimeSpan.FromSeconds(requestTimeoutSeconds));
 
-            string normalizedPrompt = NormalizeUserPrompt(userPrompt);
-
             // Handle reset commands locally — no AI call needed.
             if (IsResetCommand(normalizedPrompt))
             {
@@ -375,6 +379,9 @@ public class GeminiConnection : MonoBehaviour
                 ShowStatus("Sahne temizlendi. Yeni bir tasarıma başlayabilirsiniz!");
                 return;
             }
+
+            if (applyGeometry && TryHandleLocalSpatialCommand(normalizedPrompt, symbolicAnalysis))
+                return;
 
             // Handle Abstract City trigger locally
             if (IsAbstractCityCommand(normalizedPrompt))
@@ -428,9 +435,6 @@ public class GeminiConnection : MonoBehaviour
                 return;
             }
 
-
-
-            SymbolicAnalysisResult symbolicAnalysis = new KeywordSymbolicInputAnalyzer().Analyze(normalizedPrompt);
             string promptWithLocalHints = BuildPromptWithLocalHints(normalizedPrompt, symbolicAnalysis);
             string commandJson = await SendPromptToGeminiAsync(promptWithLocalHints, resolvedApiKey, cancellationSource.Token);
             if (string.IsNullOrEmpty(commandJson))
@@ -530,6 +534,128 @@ public class GeminiConnection : MonoBehaviour
             Debug.Log("[GeminiConnection] Ignored spatialop fragmentation because the prompt was detected as a binary split request.");
 
         ShowStatus("");
+    }
+
+    private bool TryHandleLocalSpatialCommand(string normalizedPrompt, SymbolicAnalysisResult symbolicAnalysis)
+    {
+        string key = TextNormalizer.NormalizeKey(normalizedPrompt);
+
+        if (symbolicAnalysis != null && symbolicAnalysis.RequestsBinaryPartition)
+        {
+            EnsureGeometryManager().ProcessCommandJson(BuildLocalPartitionCommandJson(key), symbolicAnalysis);
+            ShowStatus("Bölünme uygulandı.", StatusType.Info);
+            return true;
+        }
+
+        if (IsLocalFragmentationCommand(key))
+        {
+            GeometryManager manager = EnsureGeometryManager();
+            if (manager.GetGeneratedObjectCount() <= 0)
+                return false;
+
+            EnsureSpatialFormPipeline().FragmentAllGeneratedObjects();
+            ShowStatus("Parçalanma uygulandı.", StatusType.Info);
+            return true;
+        }
+
+        if (IsLocalIntersectionCommand(key, symbolicAnalysis))
+        {
+            GeometryManager manager = EnsureGeometryManager();
+            if (manager.GetGeneratedObjectCount() < 2)
+                return false;
+
+            manager.ExecuteSceneBooleanOperation("intersection");
+            ShowStatus("Kesişim uygulandı.", StatusType.Info);
+            return true;
+        }
+
+        return false;
+    }
+
+    private GeometryManager EnsureGeometryManager()
+    {
+        if (geometryManager != null)
+            return geometryManager;
+
+        geometryManager = FindAnyObjectByType<GeometryManager>();
+        if (geometryManager != null)
+            return geometryManager;
+
+        Debug.LogWarning("[GeminiConnection] GeometryManager not found in scene. Creating one dynamically.");
+        GameObject geoObj = new GameObject("GeometryManager_Dynamic");
+        geometryManager = geoObj.AddComponent<GeometryManager>();
+        return geometryManager;
+    }
+
+    private static SpatialFormPipeline EnsureSpatialFormPipeline()
+    {
+        if (SpatialFormPipeline.Instance != null)
+            return SpatialFormPipeline.Instance;
+
+        GameObject pipelineObj = new GameObject("SpatialFormPipeline");
+        return pipelineObj.AddComponent<SpatialFormPipeline>();
+    }
+
+    private static bool IsLocalFragmentationCommand(string key)
+    {
+        return key.Contains("parcalanma")
+            || key.Contains("parcala")
+            || key.Contains("fragment")
+            || key.Contains("shatter")
+            || key.Contains("explode")
+            || key.Contains("dagit")
+            || key.Contains("patlat");
+    }
+
+    private static bool IsLocalSpatialCommandCandidate(string key, SymbolicAnalysisResult symbolicAnalysis)
+    {
+        return (symbolicAnalysis != null && symbolicAnalysis.RequestsBinaryPartition)
+            || IsLocalFragmentationCommand(key)
+            || IsLocalIntersectionCommand(key, symbolicAnalysis);
+    }
+
+    private static bool IsLocalIntersectionCommand(string key, SymbolicAnalysisResult symbolicAnalysis)
+    {
+        return (symbolicAnalysis != null && symbolicAnalysis.DetectedFormInteraction == "intersection")
+            || key.Contains("kesisim")
+            || key.Contains("kesisme")
+            || key.Contains("intersect")
+            || key.Contains("intersection")
+            || key.Contains("ortakhacim");
+    }
+
+    private static string BuildLocalPartitionCommandJson(string key)
+    {
+        string shape = InferLocalShape(key);
+        string color = InferLocalColor(key);
+        return "{\"action\":\"create\",\"shape\":\"" + shape + "\",\"color\":\"" + color + "\",\"subdivision\":1,\"scale\":[1,1,1]}";
+    }
+
+    private static string InferLocalShape(string key)
+    {
+        if (key.Contains("sphere") || key.Contains("kure") || key.Contains("ball"))
+            return "sphere";
+
+        if (key.Contains("cylinder") || key.Contains("silindir"))
+            return "cylinder";
+
+        return "cube";
+    }
+
+    private static string InferLocalColor(string key)
+    {
+        if (key.Contains("kirmizi") || key.Contains("red")) return "red";
+        if (key.Contains("mavi") || key.Contains("blue")) return "blue";
+        if (key.Contains("sari") || key.Contains("yellow")) return "yellow";
+        if (key.Contains("yesil") || key.Contains("green")) return "green";
+        if (key.Contains("siyah") || key.Contains("black")) return "black";
+        if (key.Contains("turuncu") || key.Contains("orange")) return "orange";
+        if (key.Contains("mor") || key.Contains("purple")) return "purple";
+        if (key.Contains("pembe") || key.Contains("pink")) return "pink";
+        if (key.Contains("gri") || key.Contains("gray") || key.Contains("grey")) return "gray";
+        if (key.Contains("kahverengi") || key.Contains("brown")) return "brown";
+        if (key.Contains("cyan")) return "cyan";
+        return "white";
     }
 
     private static bool ShouldSuppressSpatialOperation(string response, SymbolicAnalysisResult symbolicAnalysis)

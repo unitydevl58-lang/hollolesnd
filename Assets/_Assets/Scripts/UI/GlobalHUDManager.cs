@@ -12,7 +12,7 @@ namespace Showcase.UI
     /// GlobalHUDManager v6 — Bulletproof, non-slip, professional Dark Mode MR HUD.
     ///
     /// Hardcoded Layout Rules:
-    ///   1. Root Panel is strictly 700x500 pixels.
+    ///   1. Root Panel is strictly 700x760 pixels.
     ///   2. Main vertical layout controls both width AND height (childControlWidth = true, childControlHeight = true).
     ///   3. Every child element is assigned a strict LayoutElement defining its exact preferred size.
     ///   4. Absolutely NO dynamic auto-fitters that can cause slipping or overlapping.
@@ -57,7 +57,7 @@ namespace Showcase.UI
         static readonly Color TXT_ERROR     = new Color(1.00f, 0.45f, 0.45f, 1f);
 
         private const float PANEL_WIDTH  = 700f;
-        private const float PANEL_HEIGHT = 500f;
+        private const float PANEL_HEIGHT = 760f;
         private const float PAD = 20f;
         private const float GAP = 15f;
         private const float BTN_H = 44f;
@@ -212,7 +212,7 @@ namespace Showcase.UI
             cr.sizeDelta = new Vector2(PANEL_WIDTH, PANEL_HEIGHT);
             cr.localScale = Vector3.one * 0.001f;
 
-            // Root Panel (Strict 700x500, Pivot 0.5, Anchor 0.5)
+            // Root Panel (Strict 700x760, Pivot 0.5, Anchor 0.5)
             var mainPanel = MakePanel(canvasGO.transform, "MainPanel", BG_PANEL, uiLayer);
             _mainPanelRect = mainPanel.GetComponent<RectTransform>();
             _mainPanelRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -384,10 +384,10 @@ namespace Showcase.UI
             vLayout.childForceExpandHeight = false;
 
             var cpLE = _chatPanel.AddComponent<LayoutElement>();
-            cpLE.preferredHeight = 136f; // Rigid height for chat container
+            cpLE.preferredHeight = 306f; // Rigid height for chat container + keyboard
 
             // Status label
-            _chatStatus = MakeLabel(_chatPanel.transform, "ChatStatus", "● LLM Bağlantısı Aktif", 11f, 20f, layer);
+            _chatStatus = MakeLabel(_chatPanel.transform, "ChatStatus", "LLM Bağlantısı Aktif", 11f, 20f, layer);
             _chatStatus.fontStyle = FontStyles.Bold;
             _chatStatus.color = TXT_SUCCESS;
 
@@ -413,6 +413,8 @@ namespace Showcase.UI
 
             var sendBtn = MakePillButton(inputRow.transform, "Gönder", ACCENT_SEND, SubmitChat, 11f, 90f, BTN_H, layer);
 
+            BuildKeyboard(_chatPanel.transform, layer);
+
             // Feedback area
             var feedbackGO = new GameObject("Feedback");
             feedbackGO.transform.SetParent(_chatPanel.transform, false);
@@ -424,7 +426,103 @@ namespace Showcase.UI
             _chatFeedback.alignment = TextAlignmentOptions.Center;
 
             var fbLE = feedbackGO.AddComponent<LayoutElement>();
-            fbLE.preferredHeight = 40f;
+            fbLE.preferredHeight = 38f;
+        }
+
+        private void BuildKeyboard(Transform parent, int layer)
+        {
+            var keyboard = new GameObject("Keyboard");
+            keyboard.transform.SetParent(parent, false);
+            keyboard.layer = layer;
+
+            var layout = keyboard.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            var le = keyboard.AddComponent<LayoutElement>();
+            le.preferredHeight = 146f;
+
+            BuildKeyboardLetterRow(keyboard.transform, "1234567890", layer);
+            BuildKeyboardLetterRow(keyboard.transform, "QWERTYUIOP", layer);
+            BuildKeyboardLetterRow(keyboard.transform, "ASDFGHJKL", layer);
+            BuildKeyboardLetterRow(keyboard.transform, "ZXCVBNMĞÜŞİÖÇ", layer);
+            BuildKeyboardActionRow(keyboard.transform, layer);
+        }
+
+        private void BuildKeyboardLetterRow(Transform parent, string letters, int layer)
+        {
+            var row = MakeKeyboardRow(parent, $"KeyboardRow_{letters}", layer, 26f);
+            for (int i = 0; i < letters.Length; i++)
+            {
+                string letter = letters[i].ToString();
+                MakePillButton(row.transform, letter, BG_INPUT, () => AppendKeyboardText(letter), 10f, 36f, 26f, layer);
+            }
+        }
+
+        private void BuildKeyboardActionRow(Transform parent, int layer)
+        {
+            var row = MakeKeyboardRow(parent, "KeyboardRow_Actions", layer, 26f);
+            MakePillButton(row.transform, "Boşluk", ACCENT_NAV, () => AppendKeyboardText(" "), 10f, 160f, 26f, layer);
+            MakePillButton(row.transform, "Sil", ACCENT_CLOSE, BackspaceKeyboardText, 10f, 70f, 26f, layer);
+            MakePillButton(row.transform, "Temizle", ACCENT_CLOSE, ClearKeyboardText, 10f, 90f, 26f, layer);
+            MakePillButton(row.transform, "Gönder", ACCENT_SEND, SubmitChat, 10f, 90f, 26f, layer);
+        }
+
+        private GameObject MakeKeyboardRow(Transform parent, string name, int layer, float height)
+        {
+            var row = new GameObject(name);
+            row.transform.SetParent(parent, false);
+            row.layer = layer;
+
+            var layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            var le = row.AddComponent<LayoutElement>();
+            le.preferredHeight = height;
+            return row;
+        }
+
+        private void AppendKeyboardText(string value)
+        {
+            if (_chatInput == null || string.IsNullOrEmpty(value))
+                return;
+
+            int caret = Mathf.Clamp(_chatInput.caretPosition, 0, _chatInput.text.Length);
+            _chatInput.text = _chatInput.text.Insert(caret, value);
+            _chatInput.caretPosition = caret + value.Length;
+            _chatInput.ActivateInputField();
+        }
+
+        private void BackspaceKeyboardText()
+        {
+            if (_chatInput == null || string.IsNullOrEmpty(_chatInput.text))
+                return;
+
+            int caret = Mathf.Clamp(_chatInput.caretPosition, 0, _chatInput.text.Length);
+            if (caret <= 0)
+                caret = _chatInput.text.Length;
+
+            _chatInput.text = _chatInput.text.Remove(caret - 1, 1);
+            _chatInput.caretPosition = caret - 1;
+            _chatInput.ActivateInputField();
+        }
+
+        private void ClearKeyboardText()
+        {
+            if (_chatInput == null)
+                return;
+
+            _chatInput.text = string.Empty;
+            _chatInput.ActivateInputField();
         }
 
         #endregion
@@ -441,7 +539,7 @@ namespace Showcase.UI
                 SetChatStatus("GeminiConnection bulunamadı.", true);
                 return;
             }
-            SetChatStatus("⟳ LLM'e gönderiliyor…");
+            SetChatStatus("LLM'e gönderiliyor...");
             string text = _chatInput.text;
             _chatInput.text = "";
             _chatInput.ActivateInputField();

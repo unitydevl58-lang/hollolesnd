@@ -128,6 +128,24 @@ public class SpatialFormPipeline : MonoBehaviour
         StartCoroutine(BuildInEffect(prefabOrExisting, worldPos, duration));
     }
 
+    public void FragmentAllGeneratedObjects()
+    {
+        GameObject aiRoot = GameObject.Find("AI_Scene");
+        if (aiRoot == null || aiRoot.transform.childCount == 0)
+        {
+            Debug.LogWarning("[SpatialForm] AI_Scene has no generated objects to fragment.");
+            return;
+        }
+
+        var children = new List<GameObject>(aiRoot.transform.childCount);
+        for (int i = 0; i < aiRoot.transform.childCount; i++)
+            children.Add(aiRoot.transform.GetChild(i).gameObject);
+
+        for (int i = 0; i < children.Count; i++)
+            if (children[i] != null)
+                StartCoroutine(AnimateFragmentation(children[i]));
+    }
+
     #endregion
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -438,6 +456,7 @@ public class SpatialFormPipeline : MonoBehaviour
         Bounds  bounds   = GetBounds(source);
         Vector3 center   = bounds.center;
         var     fragments = new List<GameObject>();
+        Transform fragmentParent = source.transform.parent;
 
         // Create fragments as scaled copies
         Renderer srcRend = source.GetComponentInChildren<Renderer>();
@@ -453,6 +472,7 @@ public class SpatialFormPipeline : MonoBehaviour
 
             GameObject frag = GameObject.CreatePrimitive(PrimitiveType.Cube);
             frag.name = $"Fragment_{i}";
+            frag.transform.SetParent(fragmentParent, worldPositionStays: true);
             frag.transform.position   = center + offset * 0.3f;
             frag.transform.localScale = Vector3.one * scale;
             frag.transform.rotation   = Random.rotation;
@@ -471,6 +491,8 @@ public class SpatialFormPipeline : MonoBehaviour
                             + Vector3.up * Random.Range(0.5f, 2f);
             rb.linearVelocity = burst;
             rb.AddTorque(Random.insideUnitSphere * 3f, ForceMode.Impulse);
+
+            MakeRuntimeFragmentInteractable(frag);
 
             fragments.Add(frag);
         }
@@ -542,6 +564,7 @@ public class SpatialFormPipeline : MonoBehaviour
         // Top half
         GameObject topHalf = GameObject.CreatePrimitive(PrimitiveType.Cube);
         topHalf.name = "Slice_Top";
+        topHalf.transform.SetParent(source.transform.parent, worldPositionStays: true);
         topHalf.transform.position   = center + Vector3.up * bounds.extents.y * 0.5f;
         topHalf.transform.localScale = new Vector3(bounds.size.x, bounds.size.y * 0.5f, bounds.size.z);
         if (mat != null) topHalf.GetComponent<Renderer>().sharedMaterial = mat;
@@ -549,9 +572,13 @@ public class SpatialFormPipeline : MonoBehaviour
         // Bottom half
         GameObject botHalf = GameObject.CreatePrimitive(PrimitiveType.Cube);
         botHalf.name = "Slice_Bottom";
+        botHalf.transform.SetParent(source.transform.parent, worldPositionStays: true);
         botHalf.transform.position   = center - Vector3.up * bounds.extents.y * 0.5f;
         botHalf.transform.localScale = new Vector3(bounds.size.x, bounds.size.y * 0.5f, bounds.size.z);
         if (mat != null) botHalf.GetComponent<Renderer>().sharedMaterial = mat;
+
+        MakeRuntimeFragmentInteractable(topHalf);
+        MakeRuntimeFragmentInteractable(botHalf);
 
         Object.Destroy(source);
 
@@ -597,6 +624,33 @@ public class SpatialFormPipeline : MonoBehaviour
         Collider c = go.GetComponent<Collider>();
         if (c != null) return c.bounds;
         return new Bounds(go.transform.position, Vector3.one * 0.5f);
+    }
+
+    private static void MakeRuntimeFragmentInteractable(GameObject obj)
+    {
+        if (obj == null)
+            return;
+
+        Rigidbody rb = obj.GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            rb = obj.AddComponent<Rigidbody>();
+            rb.useGravity = false;
+            rb.isKinematic = true;
+        }
+
+        var grab = obj.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+        if (grab == null)
+            grab = obj.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+
+        grab.movementType = UnityEngine.XR.Interaction.Toolkit.Interactables.XRBaseInteractable.MovementType.Kinematic;
+        grab.throwOnDetach = true;
+
+        if (obj.GetComponent<HoloLensApp.Interaction.Snapping.GridSnapper>() == null)
+            obj.AddComponent<HoloLensApp.Interaction.Snapping.GridSnapper>();
+
+        if (obj.GetComponent<HoloLensApp.Interaction.Math.FormInteractable>() == null)
+            obj.AddComponent<HoloLensApp.Interaction.Math.FormInteractable>();
     }
 
     /// <summary>Flashes objects by briefly swapping to emissive material.</summary>

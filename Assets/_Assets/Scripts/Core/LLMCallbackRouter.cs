@@ -72,6 +72,22 @@ public static class LLMCallbackRouter
                     for (int i = 0; i < aiRoot.transform.childCount; i++)
                         children.Add(aiRoot.transform.GetChild(i).gameObject);
 
+                    if (IsBinaryOperation(op))
+                    {
+                        GeometryManager manager = Object.FindAnyObjectByType<GeometryManager>();
+                        if (manager != null)
+                            return manager.ExecuteSceneBooleanOperation(op);
+
+                        if (children.Count < 2)
+                        {
+                            Debug.LogWarning($"[LLMRouter] Operation '{op}' requires at least two AI_Scene objects.");
+                            return false;
+                        }
+
+                        pipeline.ExecuteFormOperation(op, children[children.Count - 2], children[children.Count - 1]);
+                        return true;
+                    }
+
                     foreach (var child in children)
                         pipeline.ExecuteFormOperation(op, child, null);
                 }
@@ -111,6 +127,47 @@ public static class LLMCallbackRouter
         if (blockEnd < 0) return null;
 
         return text.Substring(blockStart, blockEnd - blockStart).Trim();
+    }
+
+    private static bool IsBinaryOperation(string operation)
+    {
+        string op = NormalizeOperation(operation);
+        return op == "intersection"
+            || op == "intersect"
+            || op == "kes"
+            || op == "kesisme"
+            || op == "kesisim"
+            || op == "union"
+            || op == "birlesme"
+            || op == "subtraction"
+            || op == "subtract"
+            || op == "eksilme"
+            || op == "merge"
+            || op == "merging";
+    }
+
+    private static string NormalizeOperation(string operation)
+    {
+        if (string.IsNullOrWhiteSpace(operation))
+            return string.Empty;
+
+        return operation.Trim()
+            .Replace("İ", "I")
+            .Replace("ı", "i")
+            .Replace("ş", "s")
+            .Replace("Ş", "S")
+            .Replace("ğ", "g")
+            .Replace("Ğ", "G")
+            .Replace("ü", "u")
+            .Replace("Ü", "U")
+            .Replace("ö", "o")
+            .Replace("Ö", "O")
+            .Replace("ç", "c")
+            .Replace("Ç", "C")
+            .Replace(" ", string.Empty)
+            .Replace("_", string.Empty)
+            .Replace("-", string.Empty)
+            .ToLowerInvariant();
     }
 
     /// <summary>

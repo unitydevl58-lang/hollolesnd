@@ -43,7 +43,8 @@ public sealed class KeywordSymbolicInputAnalyzer : ISymbolicInputAnalyzer
 
         Register(CommandSymbolType.SplitOperator,
             "split", "divide", "partition", "binary", "half", "halves",
-            "ikiye", "2ye", "yarim", "yarım", "ayir", "ayır", "bol", "böl");
+            "ikiye", "2ye", "yarim", "yarım", "ayir", "ayır",
+            "bol", "böl", "bolunme", "bölünme", "bolme", "bölme");
 
         // ── Wong (1969) — 8 form interactions ────────────────────────────────────
         RegisterInteraction("detachment",

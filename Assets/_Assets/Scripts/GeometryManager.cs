@@ -308,6 +308,17 @@ public class GeometryManager : MonoBehaviour
         return JsonConvert.SerializeObject(list);
     }
 
+    public int GetGeneratedObjectCount()
+    {
+        GameObject root = GameObject.Find(sceneRootName);
+        return root != null ? root.transform.childCount : 0;
+    }
+
+    public bool ExecuteSceneBooleanOperation(string action)
+    {
+        return ExecuteCSGAction(action);
+    }
+
 
     /// <summary>
     /// Converts raw Gemini output into a list of validated DesignCommand objects.
@@ -1367,44 +1378,181 @@ public class GeometryManager : MonoBehaviour
     private bool IsCSGAction(string action)
     {
         string normalized = NormalizeText(action);
-        return normalized == "intersect" || normalized == "kes" || normalized == "kesisim" ||
-               normalized == "union" || normalized == "birlestir" || normalized == "merge" ||
-               normalized == "subtract" || normalized == "cikar" || normalized == "fark";
+        return normalized == "intersect" || normalized == "intersection" || normalized == "kes" || normalized == "kesisim" || normalized == "kesisme" ||
+               normalized == "union" || normalized == "birlesme" || normalized == "birlestir" || normalized == "merge" || normalized == "merging" ||
+               normalized == "subtract" || normalized == "subtraction" || normalized == "cikar" || normalized == "fark";
     }
 
-    private void ExecuteCSGAction(string action)
+    private bool ExecuteCSGAction(string action)
     {
         GameObject root = GameObject.Find(sceneRootName);
         if (root == null || root.transform.childCount < 2)
         {
             ShowError("Sahne'de islem yapacak en az 2 obje bulunamadi!");
-            return;
+            return false;
         }
 
-        // Just grab the first two children for the demo.
-        // In a more complex setup, you could find the intersecting ones using Physics.OverlapBox.
-        GameObject objA = root.transform.GetChild(0).gameObject;
-        GameObject objB = root.transform.GetChild(1).gameObject;
+        GameObject objA = root.transform.GetChild(root.transform.childCount - 2).gameObject;
+        GameObject objB = root.transform.GetChild(root.transform.childCount - 1).gameObject;
 
         CSGOperationType op = CSGOperationType.Subtraction;
         string normalized = NormalizeText(action);
-        if (normalized == "intersect" || normalized == "kes" || normalized == "kesisim") op = CSGOperationType.Intersection;
-        if (normalized == "union" || normalized == "birlestir" || normalized == "merge") op = CSGOperationType.Union;
+        if (normalized == "intersect" || normalized == "intersection" || normalized == "kes" || normalized == "kesisim" || normalized == "kesisme") op = CSGOperationType.Intersection;
+        if (normalized == "union" || normalized == "birlesme" || normalized == "birlestir" || normalized == "merge" || normalized == "merging") op = CSGOperationType.Union;
+
+        if (op == CSGOperationType.Intersection && TryCreateAabbIntersection(objA, objB, root.transform))
+        {
+            Debug.Log("[GeometryManager] AABB intersection result created.");
+            return true;
+        }
 
         if (ShapeInteractionManager.Instance != null)
         {
             ShapeInteractionManager.Instance.RequestCSG(objA, objB, op);
             Debug.Log($"[GeometryManager] CSG Operation {op} dispatched via ShapeInteractionManager.");
+            return true;
         }
         else if (CSGFormManager.Instance != null)
         {
             CSGFormManager.Instance.ProcessCSGOperation(objA, objB, op);
             Debug.Log($"[GeometryManager] CSG Operation {op} started via CSGFormManager.");
+            return true;
         }
         else
         {
             Debug.LogError("[GeometryManager] No CSG pipeline available (ShapeInteractionManager / CSGFormManager).");
+            return false;
         }
+    }
+
+    private bool TryCreateAabbIntersection(GameObject objA, GameObject objB, Transform parent)
+    {
+        if (!TryPrepareIntersectionBounds(objA, objB, out Bounds aBounds, out Bounds bBounds))
+        {
+            ShowError("[GeometryManager] Kesisim icin ortak hacim olusturulamadi.");
+            return false;
+        }
+
+        float minX = Mathf.Max(aBounds.min.x, bBounds.min.x);
+        float minY = Mathf.Max(aBounds.min.y, bBounds.min.y);
+        float minZ = Mathf.Max(aBounds.min.z, bBounds.min.z);
+        float maxX = Mathf.Min(aBounds.max.x, bBounds.max.x);
+        float maxY = Mathf.Min(aBounds.max.y, bBounds.max.y);
+        float maxZ = Mathf.Min(aBounds.max.z, bBounds.max.z);
+
+        Vector3 size = new Vector3(maxX - minX, maxY - minY, maxZ - minZ);
+        if (size.x <= Mathf.Epsilon || size.y <= Mathf.Epsilon || size.z <= Mathf.Epsilon)
+            return false;
+
+        GameObject result = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        result.name = $"CSG_Intersection_AABB_{parent.childCount}";
+        result.transform.SetParent(parent, worldPositionStays: true);
+        result.transform.position = new Vector3(minX + size.x * 0.5f, minY + size.y * 0.5f, minZ + size.z * 0.5f);
+        result.transform.localScale = size;
+
+        Renderer renderer = result.GetComponent<Renderer>();
+        if (renderer != null)
+            renderer.sharedMaterial = CreateMaterial("white");
+
+        MakeGeneratedResultInteractable(result);
+
+        GeminiConnection gemini = FindAnyObjectByType<GeminiConnection>();
+        gemini?.SendPhysicsResultToLLM($"CSG Intersection tamamlandi. Ortak hacim: {WongMathUtility.CalculateIntersectionVolume(aBounds, bBounds):F3} m3.");
+
+        return true;
+    }
+
+    private bool TryPrepareIntersectionBounds(GameObject objA, GameObject objB, out Bounds aBounds, out Bounds bBounds)
+    {
+        bool hasA = TryGetObjectBounds(objA, out aBounds);
+        bool hasB = TryGetObjectBounds(objB, out bBounds);
+        if (!hasA || !hasB)
+            return false;
+
+        if (WongMathUtility.CalculateIntersectionVolume(aBounds, bBounds) > Mathf.Epsilon)
+            return true;
+
+        float xOffset = Mathf.Max(0.02f, Mathf.Min(aBounds.extents.x, bBounds.extents.x) * 0.5f);
+        Vector3 desiredCenter = aBounds.center + Vector3.right * xOffset;
+        objB.transform.position += desiredCenter - bBounds.center;
+
+        return TryGetObjectBounds(objA, out aBounds)
+            && TryGetObjectBounds(objB, out bBounds)
+            && WongMathUtility.CalculateIntersectionVolume(aBounds, bBounds) > Mathf.Epsilon;
+    }
+
+    private static bool TryGetObjectBounds(GameObject obj, out Bounds bounds)
+    {
+        bounds = new Bounds(obj != null ? obj.transform.position : Vector3.zero, Vector3.zero);
+        if (obj == null)
+            return false;
+
+        bool hasBounds = false;
+
+        Renderer[] renderers = obj.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        Collider[] colliders = obj.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+            if (collider == null)
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = collider.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(collider.bounds);
+            }
+        }
+
+        return hasBounds;
+    }
+
+    private static void MakeGeneratedResultInteractable(GameObject result)
+    {
+        Rigidbody rb = result.GetComponent<Rigidbody>();
+        if (rb == null)
+            rb = result.AddComponent<Rigidbody>();
+
+        rb.useGravity = false;
+        rb.isKinematic = true;
+        rb.mass = 5f;
+        rb.linearDamping = 5f;
+        rb.angularDamping = 5f;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
+        var grab = result.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+        if (grab == null)
+            grab = result.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+
+        grab.movementType = UnityEngine.XR.Interaction.Toolkit.Interactables.XRBaseInteractable.MovementType.Kinematic;
+        grab.throwOnDetach = true;
+
+        if (result.GetComponent<FormInteractable>() == null)
+            result.AddComponent<FormInteractable>();
+
+        if (result.GetComponent<GridSnapper>() == null)
+            result.AddComponent<GridSnapper>();
     }
 
     private bool IsPartitionEnabled(JToken token)

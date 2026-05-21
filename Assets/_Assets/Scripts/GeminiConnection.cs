@@ -365,7 +365,7 @@ public class GeminiConnection : MonoBehaviour
         string resolvedApiKey = ResolveApiKey();
 
         BeginLoadingState();
-        lastRequestTime = Time.realtimeSinceStartup;
+        lastRequestTime = bypassCooldown ? -999f : Time.realtimeSinceStartup;
 
         try
         {
@@ -542,8 +542,22 @@ public class GeminiConnection : MonoBehaviour
 
         if (symbolicAnalysis != null && symbolicAnalysis.RequestsBinaryPartition)
         {
-            EnsureGeometryManager().ProcessCommandJson(BuildLocalPartitionCommandJson(key), symbolicAnalysis);
+            GeometryManager manager = EnsureGeometryManager();
+            bool shouldCreateSplitShape = manager.GetGeneratedObjectCount() == 0 || IsCreateLikeCommand(key);
+
+            if (shouldCreateSplitShape)
+                manager.CreateSplitPrimitive(InferLocalShape(key), InferLocalColor(key), symbolicAnalysis.PreferredPartitionAxis);
+            else
+                manager.SplitLastGeneratedObject(symbolicAnalysis.PreferredPartitionAxis);
+
             ShowStatus("Bölünme uygulandı.", StatusType.Info);
+            return true;
+        }
+
+        if (TryReadRequestedPrimitiveCount(key, out int requestedCount) && IsLocalPrimitiveCountCommand(key))
+        {
+            EnsureGeometryManager().CreatePrimitiveBatch(InferLocalShape(key), InferLocalColor(key), requestedCount);
+            ShowStatus($"{requestedCount} nesne oluşturuldu.", StatusType.Info);
             return true;
         }
 
@@ -610,6 +624,7 @@ public class GeminiConnection : MonoBehaviour
     private static bool IsLocalSpatialCommandCandidate(string key, SymbolicAnalysisResult symbolicAnalysis)
     {
         return (symbolicAnalysis != null && symbolicAnalysis.RequestsBinaryPartition)
+            || (TryReadRequestedPrimitiveCount(key, out _) && IsLocalPrimitiveCountCommand(key))
             || IsLocalFragmentationCommand(key)
             || IsLocalIntersectionCommand(key, symbolicAnalysis);
     }
@@ -624,13 +639,6 @@ public class GeminiConnection : MonoBehaviour
             || key.Contains("ortakhacim");
     }
 
-    private static string BuildLocalPartitionCommandJson(string key)
-    {
-        string shape = InferLocalShape(key);
-        string color = InferLocalColor(key);
-        return "{\"action\":\"create\",\"shape\":\"" + shape + "\",\"color\":\"" + color + "\",\"subdivision\":1,\"scale\":[1,1,1]}";
-    }
-
     private static string InferLocalShape(string key)
     {
         if (key.Contains("sphere") || key.Contains("kure") || key.Contains("ball"))
@@ -640,6 +648,67 @@ public class GeminiConnection : MonoBehaviour
             return "cylinder";
 
         return "cube";
+    }
+
+    private static bool IsCreateLikeCommand(string key)
+    {
+        return key.Contains("olustur")
+            || key.Contains("yarat")
+            || key.Contains("yap")
+            || key.Contains("ekle")
+            || key.Contains("create")
+            || key.Contains("build")
+            || key.Contains("make")
+            || key.Contains("spawn");
+    }
+
+    private static bool IsLocalPrimitiveCountCommand(string key)
+    {
+        return key.Contains("tane")
+            || key.Contains("adet")
+            || key.Contains("kup")
+            || key.Contains("cube")
+            || key.Contains("kure")
+            || key.Contains("sphere")
+            || key.Contains("silindir")
+            || key.Contains("cylinder");
+    }
+
+    private static bool TryReadRequestedPrimitiveCount(string key, out int count)
+    {
+        count = 0;
+        if (string.IsNullOrWhiteSpace(key))
+            return false;
+
+        Match digit = Regex.Match(key, @"(?<!\d)(10|[2-9])(?!\d)");
+        if (digit.Success && int.TryParse(digit.Value, out count))
+            return true;
+
+        if (key.Contains("ikitane") || key.Contains("ikiadet") || key.Contains("ikikup") || key.Contains("ikicube"))
+        {
+            count = 2;
+            return true;
+        }
+
+        if (key.Contains("uctane") || key.Contains("ucadet") || key.Contains("uckup") || key.Contains("uccube"))
+        {
+            count = 3;
+            return true;
+        }
+
+        if (key.Contains("dorttane") || key.Contains("dortadet") || key.Contains("dortkup") || key.Contains("dortcube"))
+        {
+            count = 4;
+            return true;
+        }
+
+        if (key.Contains("bestane") || key.Contains("besadet") || key.Contains("beskup") || key.Contains("bescube"))
+        {
+            count = 5;
+            return true;
+        }
+
+        return false;
     }
 
     private static string InferLocalColor(string key)

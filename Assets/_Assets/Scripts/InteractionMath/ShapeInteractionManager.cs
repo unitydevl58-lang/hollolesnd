@@ -19,12 +19,16 @@ namespace HoloLensApp.Interaction.Math
 
         [Header("Detection")]
         [SerializeField] private float evaluationIntervalSeconds = 0.25f;
+        [SerializeField] private bool autoCreateIntersectionOnPenetration = true;
+        [SerializeField] private float minAutoIntersectionVolume = 0.0005f;
+        [SerializeField] private float autoIntersectionCooldownSeconds = 0.8f;
 
         [Header("References")]
         [SerializeField] private CSGFormManager csgFormManager;
 
         private readonly List<FormInteractable> _trackedForms = new List<FormInteractable>(32);
         private readonly Dictionary<ulong, WongInteractionState> _pairStates = new Dictionary<ulong, WongInteractionState>(64);
+        private readonly Dictionary<ulong, float> _lastAutoIntersectionTimes = new Dictionary<ulong, float>(64);
         private float _nextEvaluationTime;
 
         private void Awake()
@@ -114,6 +118,9 @@ namespace HoloLensApp.Interaction.Math
                         _pairStates[key] = state;
                         ApplyVisualState(a, b, state);
                         InteractionStateChanged?.Invoke(a.gameObject, b.gameObject, state);
+
+                        if (autoCreateIntersectionOnPenetration && state == WongInteractionState.Penetration)
+                            TryCreateRuntimeIntersection(a.gameObject, b.gameObject, key);
                     }
                 }
             }
@@ -209,17 +216,83 @@ namespace HoloLensApp.Interaction.Math
             b?.ApplyWongHighlight(state);
         }
 
+        private void TryCreateRuntimeIntersection(GameObject objA, GameObject objB, ulong pairKey)
+        {
+            if (objA == null || objB == null)
+                return;
+
+            if (IsGeneratedIntersectionResult(objA) || IsGeneratedIntersectionResult(objB))
+                return;
+
+            if (_lastAutoIntersectionTimes.TryGetValue(pairKey, out float lastTime) &&
+                Time.unscaledTime - lastTime < autoIntersectionCooldownSeconds)
+            {
+                return;
+            }
+
+            Bounds boundsA = GetWorldBounds(objA);
+            Bounds boundsB = GetWorldBounds(objB);
+            if (WongMathUtility.CalculateIntersectionVolume(boundsA, boundsB) < minAutoIntersectionVolume)
+                return;
+
+            GeometryManager geometryManager = FindAnyObjectByType<GeometryManager>();
+            if (geometryManager == null)
+                geometryManager = new GameObject("GeometryManager_Dynamic").AddComponent<GeometryManager>();
+
+            if (geometryManager.CreateIntersectionResultFromOverlap(objA, objB))
+                _lastAutoIntersectionTimes[pairKey] = Time.unscaledTime;
+        }
+
         public static Bounds GetWorldBounds(GameObject obj)
         {
-            Renderer renderer = obj.GetComponentInChildren<Renderer>();
-            if (renderer != null)
-                return renderer.bounds;
+            bool hasBounds = false;
+            Bounds bounds = new Bounds(obj.transform.position, Vector3.zero);
 
-            Collider collider = obj.GetComponentInChildren<Collider>();
-            if (collider != null)
-                return collider.bounds;
+            Renderer[] renderers = obj.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null)
+                    continue;
+
+                if (!hasBounds)
+                {
+                    bounds = renderer.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+            }
+
+            Collider[] colliders = obj.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider collider = colliders[i];
+                if (collider == null)
+                    continue;
+
+                if (!hasBounds)
+                {
+                    bounds = collider.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(collider.bounds);
+                }
+            }
+
+            if (hasBounds)
+                return bounds;
 
             return new Bounds(obj.transform.position, Vector3.one * 0.1f);
+        }
+
+        private static bool IsGeneratedIntersectionResult(GameObject obj)
+        {
+            return obj != null && obj.name.StartsWith("CSG_Intersection", StringComparison.Ordinal);
         }
 
         private static ulong PairKey(int idA, int idB)

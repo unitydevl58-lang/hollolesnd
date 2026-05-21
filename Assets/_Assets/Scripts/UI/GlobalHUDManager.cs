@@ -9,14 +9,14 @@ using UnityEngine.InputSystem;
 namespace Showcase.UI
 {
     /// <summary>
-    /// GlobalHUDManager v6 — Bulletproof, non-slip, professional Dark Mode MR HUD.
+    /// GlobalHUDManager v6 — Pastel glass MR menu.
     ///
     /// Hardcoded Layout Rules:
-    ///   1. Root Panel is strictly 700x760 pixels.
+    ///   1. Root Panel is strictly 1100x980 pixels.
     ///   2. Main vertical layout controls both width AND height (childControlWidth = true, childControlHeight = true).
     ///   3. Every child element is assigned a strict LayoutElement defining its exact preferred size.
     ///   4. Absolutely NO dynamic auto-fitters that can cause slipping or overlapping.
-    ///   5. Premium Dark Mode charcoal grey palette with centered text and crisp labels.
+    ///   5. Pastel glass palette with centered controls and crisp labels.
     /// </summary>
     public class GlobalHUDManager : MonoBehaviour
     {
@@ -38,29 +38,32 @@ namespace Showcase.UI
         private GameObject _grpShowcase;
         private GameObject _grpSandbox;
 
-        // --- Sweet, Colorful, Modern Palette ---
-        static readonly Color BG_PANEL      = new Color(0.12f, 0.10f, 0.20f, 0.94f); // Glassy dark purple/navy
-        static readonly Color BG_HEADER     = new Color(0.18f, 0.14f, 0.30f, 0.98f); // Rich violet header
-        static readonly Color BG_SUBPANEL   = new Color(0.15f, 0.12f, 0.25f, 0.95f); // Soft violet subpanel
-        static readonly Color BG_INPUT      = new Color(0.25f, 0.20f, 0.35f, 1.00f); // Bright input area
+        // --- Pastel MR palette, adapted from the supplied HTML reference ---
+        static readonly Color BG_PANEL      = new Color(0.984f, 0.973f, 0.992f, 0.92f); // #fbf8fd
+        static readonly Color BG_HEADER     = new Color(0.961f, 0.953f, 0.973f, 0.62f); // #f5f3f8
+        static readonly Color BG_SUBPANEL   = new Color(0.941f, 0.918f, 0.965f, 0.74f); // soft lavender glass
+        static readonly Color BG_INPUT      = new Color(1.000f, 1.000f, 1.000f, 0.72f);
+        static readonly Color BG_KEY        = new Color(1.000f, 1.000f, 1.000f, 0.86f);
 
-        // Vibrant Sweet Accent Colors
-        static readonly Color ACCENT_NAV      = new Color(0.85f, 0.25f, 0.55f, 1f);  // Vibrant Magenta/Pink
-        static readonly Color ACCENT_SHOWCASE = new Color(0.15f, 0.75f, 0.85f, 1f);  // Bright Cyan
-        static readonly Color ACCENT_SANDBOX  = new Color(0.20f, 0.85f, 0.60f, 1f);  // Vibrant Mint Green
-        static readonly Color ACCENT_SEND     = new Color(0.95f, 0.45f, 0.40f, 1f);  // Neon Coral
-        static readonly Color ACCENT_CLOSE    = new Color(0.95f, 0.25f, 0.35f, 1f);  // Vivid Red/Pink
+        static readonly Color ACCENT_NAV      = new Color(0.957f, 0.643f, 0.573f, 1f); // #f4a492
+        static readonly Color ACCENT_SHOWCASE = new Color(0.635f, 0.835f, 0.776f, 1f); // #a2d5c6
+        static readonly Color ACCENT_SANDBOX  = new Color(0.635f, 0.835f, 0.776f, 1f);
+        static readonly Color ACCENT_SEND     = new Color(0.957f, 0.643f, 0.573f, 1f);
+        static readonly Color ACCENT_CLOSE    = new Color(1.000f, 0.478f, 0.486f, 1f);
 
-        static readonly Color TXT_PRIMARY   = Color.white;
-        static readonly Color TXT_SECONDARY = new Color(0.85f, 0.85f, 0.95f, 1f);
-        static readonly Color TXT_SUCCESS   = new Color(0.40f, 0.95f, 0.65f, 1f);
-        static readonly Color TXT_ERROR     = new Color(1.00f, 0.45f, 0.45f, 1f);
+        static readonly Color TXT_PRIMARY   = new Color(0.290f, 0.282f, 0.298f, 1f); // #4a484c
+        static readonly Color TXT_SECONDARY = new Color(0.560f, 0.540f, 0.580f, 1f);
+        static readonly Color TXT_SUCCESS   = new Color(0.420f, 0.860f, 0.580f, 1f);
+        static readonly Color TXT_ERROR     = new Color(1.000f, 0.350f, 0.380f, 1f);
 
-        private const float PANEL_WIDTH  = 700f;
-        private const float PANEL_HEIGHT = 760f;
-        private const float PAD = 20f;
-        private const float GAP = 15f;
-        private const float BTN_H = 44f;
+        private const float PANEL_WIDTH  = 1100f;
+        private const float PANEL_HEIGHT = 980f;
+        private const float INFO_CARD_WIDTH = 320f;
+        private const float INFO_CARD_HEIGHT = 280f;
+        private const float INFO_CARD_GAP = 6f;
+        private const float PAD = 32f;
+        private const float GAP = 18f;
+        private const float BTN_H = 52f;
 
         private void Awake()
         {
@@ -210,9 +213,9 @@ namespace Showcase.UI
 
             var cr = canvasGO.GetComponent<RectTransform>();
             cr.sizeDelta = new Vector2(PANEL_WIDTH, PANEL_HEIGHT);
-            cr.localScale = Vector3.one * 0.001f;
+            cr.localScale = Vector3.one * 0.00085f;
 
-            // Root Panel (Strict 700x760, Pivot 0.5, Anchor 0.5)
+            // Root Panel (Strict 1100x980, Pivot 0.5, Anchor 0.5)
             var mainPanel = MakePanel(canvasGO.transform, "MainPanel", BG_PANEL, uiLayer);
             _mainPanelRect = mainPanel.GetComponent<RectTransform>();
             _mainPanelRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -259,6 +262,9 @@ namespace Showcase.UI
 
             // 5. LLM Chat Panel
             BuildChatPanel(mainPanel.transform, uiLayer);
+
+            // 6. Floating mentor/info card, exactly 6 px left of the main menu.
+            BuildFeedbackCard(canvasGO.transform, uiLayer);
         }
 
         private void BuildHeader(Transform parent, int layer)
@@ -267,7 +273,7 @@ namespace Showcase.UI
             
             // Header Group layout elements
             var layout = header.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(15, 15, 6, 6);
+            layout.padding = new RectOffset(24, 18, 8, 8);
             layout.spacing = GAP;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
@@ -276,14 +282,15 @@ namespace Showcase.UI
             layout.childAlignment = TextAnchor.MiddleRight;
 
             var le = header.AddComponent<LayoutElement>();
-            le.preferredHeight = 50f;
-            le.minHeight = 50f;
+            le.preferredHeight = 66f;
+            le.minHeight = 66f;
 
             // Title
-            var title = MakeLabel(header.transform, "TitleText", "DESIGN STUDIO HUB", 14f, 32f, layer);
+            var title = MakeLabel(header.transform, "TitleText", "DESIGN STUDIO HUB", 18f, 40f, layer);
             title.fontStyle = FontStyles.Bold;
             title.color = TXT_PRIMARY;
-            title.alignment = TextAlignmentOptions.Center;
+            title.alignment = TextAlignmentOptions.Left;
+            title.GetComponent<LayoutElement>().preferredWidth = 420f;
 
             // Spacer
             var spacer = new GameObject("Spacer");
@@ -292,37 +299,37 @@ namespace Showcase.UI
             spacerLE.flexibleWidth = 1f;
 
             // Chat Toggle Button
-            var chatBtn = MakePillButton(header.transform, "Chat Panel", ACCENT_NAV, ToggleChat, 10f, 100f, 32f, layer);
+            MakePillButton(header.transform, "Chat Panel", ACCENT_CLOSE, ToggleChat, 14f, 128f, 40f, layer);
 
             // Close Button
-            var closeBtn = MakePillButton(header.transform, "Kapat", ACCENT_CLOSE, HideHUD, 10f, 80f, 32f, layer);
+            MakePillButton(header.transform, "Kapat", ACCENT_NAV, HideHUD, 14f, 104f, 40f, layer);
         }
 
         private void BuildNavRow(Transform parent, int layer)
         {
             var navRow = MakePanel(parent, "NavRow", Color.clear, layer);
             var layout = navRow.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = GAP;
+            layout.spacing = 24f;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
             var le = navRow.AddComponent<LayoutElement>();
-            le.preferredHeight = BTN_H;
+            le.preferredHeight = 72f;
 
-            MakePillButton(navRow.transform, "Ana Menü (MainMenu)", ACCENT_NAV, () => LoadScene("MainMenu_Scene"), 11f, 200f, BTN_H, layer);
-            MakePillButton(navRow.transform, "Sandbox Sahnesi", ACCENT_SANDBOX, () => LoadScene("Sandbox_Scene"), 11f, 200f, BTN_H, layer);
-            MakePillButton(navRow.transform, "Showcase Sahnesi", ACCENT_SHOWCASE, () => LoadScene("Showcase_Scene"), 11f, 200f, BTN_H, layer);
+            MakePillButton(navRow.transform, "Ana Menü (MainMenu)", ACCENT_NAV, () => LoadScene("MainMenu_Scene"), 15f, 320f, 64f, layer);
+            MakePillButton(navRow.transform, "Sandbox Sahnesi", ACCENT_SANDBOX, () => LoadScene("Sandbox_Scene"), 15f, 320f, 64f, layer);
+            MakePillButton(navRow.transform, "Showcase Sahnesi", ACCENT_SHOWCASE, () => LoadScene("Showcase_Scene"), 15f, 320f, 64f, layer);
         }
 
         private GameObject BuildGroup(Transform parent, string labelText, Color borderAccent, (string label, System.Action action)[] buttons, int layer)
         {
-            var group = MakePanel(parent, $"Group_{labelText}", BG_SUBPANEL, layer);
+            var group = MakePanel(parent, $"Group_{labelText}", Color.clear, layer);
             
             var vLayout = group.AddComponent<VerticalLayoutGroup>();
-            vLayout.padding = new RectOffset(15, 15, 10, 10);
-            vLayout.spacing = 10;
+            vLayout.padding = new RectOffset(0, 0, 8, 8);
+            vLayout.spacing = 16;
             vLayout.childControlWidth = true;
             vLayout.childControlHeight = true;
             vLayout.childForceExpandWidth = true;
@@ -337,7 +344,7 @@ namespace Showcase.UI
             hrLayout.childForceExpandWidth = true;
             hrLayout.childForceExpandHeight = false;
 
-            var title = MakeLabel(headerRow.transform, "Title", labelText, 11f, 20f, layer);
+            var title = MakeLabel(headerRow.transform, "Title", labelText, 18f, 30f, layer);
             title.fontStyle = FontStyles.Bold;
             title.color = borderAccent;
 
@@ -345,28 +352,26 @@ namespace Showcase.UI
             var gridGO = new GameObject("Grid");
             gridGO.transform.SetParent(group.transform, false);
             var grid = gridGO.AddComponent<GridLayoutGroup>();
-            grid.spacing = new Vector2(GAP, GAP);
+            grid.spacing = new Vector2(22f, 18f);
             
-            // Fixed width calculation: PANEL_WIDTH (700) - PAD*2 (40) - SubPanelPadding (30) = 630.
-            // 3 columns: (630 - GAP*2) / 3 = 200 cell size.
-            grid.cellSize = new Vector2(200f, BTN_H);
+            grid.cellSize = new Vector2(300f, 52f);
             grid.childAlignment = TextAnchor.UpperCenter;
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 3;
 
             int rows = Mathf.CeilToInt((float)buttons.Length / 3f);
-            float gridH = rows * (BTN_H + GAP) - GAP;
+            float gridH = rows * 52f + Mathf.Max(0, rows - 1) * 18f;
 
             var gridLE = gridGO.AddComponent<LayoutElement>();
             gridLE.preferredHeight = gridH;
 
             // Define Group Container height strictly
             var groupLE = group.AddComponent<LayoutElement>();
-            groupLE.preferredHeight = 20f + 10f + gridH + 20f; // Label + Spacing + Grid + Padding
+            groupLE.preferredHeight = 30f + 16f + gridH + 18f;
 
             for (int i = 0; i < buttons.Length; i++)
             {
-                MakePillButton(gridGO.transform, buttons[i].label, borderAccent, buttons[i].action, 11f, 200f, BTN_H, layer);
+                MakePillButton(gridGO.transform, buttons[i].label, borderAccent, buttons[i].action, 14f, 300f, 52f, layer);
             }
 
             return group;
@@ -376,18 +381,18 @@ namespace Showcase.UI
         {
             _chatPanel = MakePanel(parent, "ChatPanel", BG_SUBPANEL, layer);
             var vLayout = _chatPanel.AddComponent<VerticalLayoutGroup>();
-            vLayout.padding = new RectOffset(15, 15, 8, 8);
-            vLayout.spacing = 8;
+            vLayout.padding = new RectOffset(28, 28, 24, 18);
+            vLayout.spacing = 12;
             vLayout.childControlWidth = true;
             vLayout.childControlHeight = true;
             vLayout.childForceExpandWidth = true;
             vLayout.childForceExpandHeight = false;
 
             var cpLE = _chatPanel.AddComponent<LayoutElement>();
-            cpLE.preferredHeight = 306f; // Rigid height for chat container + keyboard
+            cpLE.preferredHeight = 430f; // Rigid height for chat container + keyboard
 
             // Status label
-            _chatStatus = MakeLabel(_chatPanel.transform, "ChatStatus", "LLM Bağlantısı Aktif", 11f, 20f, layer);
+            _chatStatus = MakeLabel(_chatPanel.transform, "ChatStatus", "LLM Bağlantısı Aktif", 16f, 24f, layer);
             _chatStatus.fontStyle = FontStyles.Bold;
             _chatStatus.color = TXT_SUCCESS;
 
@@ -395,38 +400,65 @@ namespace Showcase.UI
             var inputRow = new GameObject("InputRow");
             inputRow.transform.SetParent(_chatPanel.transform, false);
             var irLayout = inputRow.AddComponent<HorizontalLayoutGroup>();
-            irLayout.spacing = GAP;
+            irLayout.spacing = 8f;
             irLayout.childControlWidth = true;
             irLayout.childControlHeight = true;
             irLayout.childForceExpandWidth = false;
             irLayout.childForceExpandHeight = false;
 
             var irLE = inputRow.AddComponent<LayoutElement>();
-            irLE.preferredHeight = BTN_H;
+            irLE.preferredHeight = 48f;
 
             var inputField = MakeInputField(inputRow.transform, "Input", layer);
             _chatInput = inputField.GetComponent<TMP_InputField>();
             _chatInput.onSubmit.AddListener(_ => SubmitChat());
             var ifLE = inputField.AddComponent<LayoutElement>();
             ifLE.flexibleWidth = 1f;
-            ifLE.preferredHeight = BTN_H;
+            ifLE.preferredHeight = 48f;
 
-            var sendBtn = MakePillButton(inputRow.transform, "Gönder", ACCENT_SEND, SubmitChat, 11f, 90f, BTN_H, layer);
+            MakePillButton(inputRow.transform, "Gönder", ACCENT_SEND, SubmitChat, 14f, 120f, 44f, layer);
 
             BuildKeyboard(_chatPanel.transform, layer);
+        }
 
-            // Feedback area
-            var feedbackGO = new GameObject("Feedback");
-            feedbackGO.transform.SetParent(_chatPanel.transform, false);
-            _chatFeedback = feedbackGO.AddComponent<TextMeshProUGUI>();
-            _chatFeedback.fontSize = 11f;
-            _chatFeedback.color = TXT_SECONDARY;
-            _chatFeedback.text = "Model cevapları bu alanda görüntülenecektir.";
+        private void BuildFeedbackCard(Transform parent, int layer)
+        {
+            GameObject feedbackCard = MakePanel(parent, "PromptInfoCard", BG_SUBPANEL, layer);
+            RectTransform cardRect = feedbackCard.GetComponent<RectTransform>();
+            cardRect.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRect.pivot = new Vector2(1f, 0.5f);
+            cardRect.sizeDelta = new Vector2(INFO_CARD_WIDTH, INFO_CARD_HEIGHT);
+            cardRect.anchoredPosition = new Vector2(-(PANEL_WIDTH * 0.5f + INFO_CARD_GAP), 96f);
+
+            var layout = feedbackCard.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(20, 20, 18, 18);
+            layout.spacing = 10f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            var title = MakeLabel(feedbackCard.transform, "InfoTitle", "BİLGİ", 15f, 24f, layer);
+            title.fontStyle = FontStyles.Bold;
+            title.color = ACCENT_SEND;
+            title.alignment = TextAlignmentOptions.Left;
+
+            var bodyGO = new GameObject("InfoBody");
+            bodyGO.transform.SetParent(feedbackCard.transform, false);
+            bodyGO.layer = layer;
+
+            var bodyLE = bodyGO.AddComponent<LayoutElement>();
+            bodyLE.preferredHeight = INFO_CARD_HEIGHT - 72f;
+            bodyLE.flexibleHeight = 1f;
+
+            _chatFeedback = bodyGO.AddComponent<TextMeshProUGUI>();
+            _chatFeedback.fontSize = 14f;
+            _chatFeedback.color = TXT_PRIMARY;
+            _chatFeedback.text = "Model cevapları burada görünecek.";
             _chatFeedback.textWrappingMode = TextWrappingModes.Normal;
-            _chatFeedback.alignment = TextAlignmentOptions.Center;
-
-            var fbLE = feedbackGO.AddComponent<LayoutElement>();
-            fbLE.preferredHeight = 38f;
+            _chatFeedback.overflowMode = TextOverflowModes.Ellipsis;
+            _chatFeedback.alignment = TextAlignmentOptions.TopLeft;
         }
 
         private void BuildKeyboard(Transform parent, int layer)
@@ -436,7 +468,7 @@ namespace Showcase.UI
             keyboard.layer = layer;
 
             var layout = keyboard.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 4f;
+            layout.spacing = 8f;
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
@@ -444,32 +476,32 @@ namespace Showcase.UI
             layout.childForceExpandHeight = false;
 
             var le = keyboard.AddComponent<LayoutElement>();
-            le.preferredHeight = 146f;
+            le.preferredHeight = 240f;
 
             BuildKeyboardLetterRow(keyboard.transform, "1234567890", layer);
-            BuildKeyboardLetterRow(keyboard.transform, "QWERTYUIOP", layer);
-            BuildKeyboardLetterRow(keyboard.transform, "ASDFGHJKL", layer);
-            BuildKeyboardLetterRow(keyboard.transform, "ZXCVBNMĞÜŞİÖÇ", layer);
+            BuildKeyboardLetterRow(keyboard.transform, "QWERTYUIOPĞÜ", layer);
+            BuildKeyboardLetterRow(keyboard.transform, "ASDFGHJKLŞİ", layer);
+            BuildKeyboardLetterRow(keyboard.transform, "ZXCVBNMÖÇ", layer);
             BuildKeyboardActionRow(keyboard.transform, layer);
         }
 
         private void BuildKeyboardLetterRow(Transform parent, string letters, int layer)
         {
-            var row = MakeKeyboardRow(parent, $"KeyboardRow_{letters}", layer, 26f);
+            var row = MakeKeyboardRow(parent, $"KeyboardRow_{letters}", layer, 40f);
             for (int i = 0; i < letters.Length; i++)
             {
                 string letter = letters[i].ToString();
-                MakePillButton(row.transform, letter, BG_INPUT, () => AppendKeyboardText(letter), 10f, 36f, 26f, layer);
+                MakePillButton(row.transform, letter, BG_KEY, () => AppendKeyboardText(letter), 14f, 42f, 40f, layer);
             }
         }
 
         private void BuildKeyboardActionRow(Transform parent, int layer)
         {
-            var row = MakeKeyboardRow(parent, "KeyboardRow_Actions", layer, 26f);
-            MakePillButton(row.transform, "Boşluk", ACCENT_NAV, () => AppendKeyboardText(" "), 10f, 160f, 26f, layer);
-            MakePillButton(row.transform, "Sil", ACCENT_CLOSE, BackspaceKeyboardText, 10f, 70f, 26f, layer);
-            MakePillButton(row.transform, "Temizle", ACCENT_CLOSE, ClearKeyboardText, 10f, 90f, 26f, layer);
-            MakePillButton(row.transform, "Gönder", ACCENT_SEND, SubmitChat, 10f, 90f, 26f, layer);
+            var row = MakeKeyboardRow(parent, "KeyboardRow_Actions", layer, 48f);
+            MakePillButton(row.transform, "Boşluk", ACCENT_NAV, () => AppendKeyboardText(" "), 14f, 210f, 48f, layer);
+            MakePillButton(row.transform, "Sil", ACCENT_CLOSE, BackspaceKeyboardText, 14f, 104f, 48f, layer);
+            MakePillButton(row.transform, "Temizle", ACCENT_NAV, ClearKeyboardText, 14f, 142f, 48f, layer);
+            MakePillButton(row.transform, "Gönder", ACCENT_SEND, SubmitChat, 14f, 142f, 48f, layer);
         }
 
         private GameObject MakeKeyboardRow(Transform parent, string name, int layer, float height)
@@ -479,7 +511,7 @@ namespace Showcase.UI
             row.layer = layer;
 
             var layout = row.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 4f;
+            layout.spacing = 8f;
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
@@ -496,9 +528,8 @@ namespace Showcase.UI
             if (_chatInput == null || string.IsNullOrEmpty(value))
                 return;
 
-            int caret = Mathf.Clamp(_chatInput.caretPosition, 0, _chatInput.text.Length);
-            _chatInput.text = _chatInput.text.Insert(caret, value);
-            _chatInput.caretPosition = caret + value.Length;
+            _chatInput.text = (_chatInput.text ?? string.Empty) + value;
+            _chatInput.caretPosition = _chatInput.text.Length;
             _chatInput.ActivateInputField();
         }
 
@@ -507,12 +538,8 @@ namespace Showcase.UI
             if (_chatInput == null || string.IsNullOrEmpty(_chatInput.text))
                 return;
 
-            int caret = Mathf.Clamp(_chatInput.caretPosition, 0, _chatInput.text.Length);
-            if (caret <= 0)
-                caret = _chatInput.text.Length;
-
-            _chatInput.text = _chatInput.text.Remove(caret - 1, 1);
-            _chatInput.caretPosition = caret - 1;
+            _chatInput.text = _chatInput.text.Remove(_chatInput.text.Length - 1, 1);
+            _chatInput.caretPosition = _chatInput.text.Length;
             _chatInput.ActivateInputField();
         }
 
@@ -617,6 +644,9 @@ namespace Showcase.UI
             img.sprite = Resources.Load<Sprite>("UI/Skin/UISprite");
             img.type = Image.Type.Sliced;
 
+            if (color.a > 0.01f)
+                AddSoftShadow(go, name == "MainPanel" ? 0.16f : 0.08f, name == "MainPanel" ? -10f : -4f);
+
             return go;
         }
 
@@ -662,6 +692,7 @@ namespace Showcase.UI
             img.color = accent;
             img.sprite = Resources.Load<Sprite>("UI/Skin/UISprite");
             img.type = Image.Type.Sliced;
+            AddSoftShadow(go, 0.12f, -4f);
 
             var btn = go.AddComponent<Button>();
             var cb = btn.colors;
@@ -679,7 +710,7 @@ namespace Showcase.UI
             var tmp = lgo.AddComponent<TextMeshProUGUI>();
             tmp.text = label;
             tmp.fontSize = fontSize;
-            tmp.color = TXT_PRIMARY;
+            tmp.color = GetReadableButtonTextColor(accent);
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
@@ -725,11 +756,11 @@ namespace Showcase.UI
             phGO.transform.SetParent(vpGO.transform, false);
             phGO.layer = layer;
             var ph = phGO.AddComponent<TextMeshProUGUI>();
-            ph.text = "Komutunuzu yazın…";
-            ph.fontSize = 12f;
-            ph.color = new Color(0.5f, 0.5f, 0.6f, 1f);
+            ph.text = "Komutunuzu yazın";
+            ph.fontSize = 14f;
+            ph.color = new Color(0.56f, 0.54f, 0.58f, 0.82f);
             ph.fontStyle = FontStyles.Italic;
-            ph.alignment = TextAlignmentOptions.Center;
+            ph.alignment = TextAlignmentOptions.Left;
             var phR = ph.rectTransform;
             phR.anchorMin = Vector2.zero;
             phR.anchorMax = Vector2.one;
@@ -739,9 +770,9 @@ namespace Showcase.UI
             txGO.transform.SetParent(vpGO.transform, false);
             txGO.layer = layer;
             var tx = txGO.AddComponent<TextMeshProUGUI>();
-            tx.fontSize = 12f;
+            tx.fontSize = 14f;
             tx.color = TXT_PRIMARY;
-            tx.alignment = TextAlignmentOptions.Center;
+            tx.alignment = TextAlignmentOptions.Left;
             var txR = tx.rectTransform;
             txR.anchorMin = Vector2.zero;
             txR.anchorMax = Vector2.one;
@@ -753,6 +784,20 @@ namespace Showcase.UI
             field.lineType = TMP_InputField.LineType.SingleLine;
 
             return go;
+        }
+
+        private static Color GetReadableButtonTextColor(Color background)
+        {
+            float luminance = background.r * 0.2126f + background.g * 0.7152f + background.b * 0.0722f;
+            return luminance > 0.74f ? TXT_PRIMARY : Color.white;
+        }
+
+        private static void AddSoftShadow(GameObject target, float alpha, float yOffset)
+        {
+            var shadow = target.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, alpha);
+            shadow.effectDistance = new Vector2(0f, yOffset);
+            shadow.useGraphicAlpha = true;
         }
 
         #endregion

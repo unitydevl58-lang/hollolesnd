@@ -319,6 +319,86 @@ public class GeometryManager : MonoBehaviour
         return ExecuteCSGAction(action);
     }
 
+    public bool CreateIntersectionResultFromOverlap(GameObject objA, GameObject objB)
+    {
+        GameObject root = GameObject.Find(sceneRootName) ?? new GameObject(sceneRootName);
+        return TryCreateAabbIntersection(objA, objB, root.transform, allowAutoOverlap: false);
+    }
+
+    public bool CreatePrimitiveBatch(string shapeName, string colorValue, int count)
+    {
+        count = Mathf.Clamp(count, 1, MaxSubdivision);
+        GameObject sceneRoot = GameObject.Find(sceneRootName) ?? new GameObject(sceneRootName);
+
+        VoxelShape shape = ResolveShape(shapeName);
+        float step = BaseObjectSize + DefaultObjectGap;
+        float startX = -((count - 1) * step) * 0.5f;
+
+        List<DesignCommand> commands = new List<DesignCommand>(count);
+        for (int i = 0; i < count; i++)
+        {
+            commands.Add(new DesignCommand
+            {
+                Action = "create",
+                Shape = shape,
+                Subdivision = shape == VoxelShape.Cube ? MinSubdivision : MinCurvedSubdivision,
+                ColorValue = colorValue,
+                ScaleVector = Vector3.one,
+                Scale = 1f,
+                PositionOffset = new Vector3(startX + i * step, 0f, 0f)
+            });
+        }
+
+        for (int i = 0; i < commands.Count; i++)
+            CreateObject(commands[i], sceneRoot.transform, i);
+
+        RememberCreatedCommands(commands);
+        Debug.Log($"[GeometryManager] Created {count} primitive object(s) locally.");
+        return true;
+    }
+
+    public bool CreateSplitPrimitive(string shapeName, string colorValue, PartitionAxis axis)
+    {
+        if (!_sessionAnchorSet)
+        {
+            _sessionAnchor = GetCameraForwardPosition();
+            _sessionAnchorSet = true;
+        }
+
+        GameObject sceneRoot = GameObject.Find(sceneRootName) ?? new GameObject(sceneRootName);
+        Material material = CreateMaterial(colorValue);
+        Bounds bounds = new Bounds(_sessionAnchor, Vector3.one * 0.95f);
+        bool result = CreateSplitPiecesFromBounds(bounds, material, sceneRoot.transform, ResolveShape(shapeName).ToString(), axis);
+
+        if (result)
+        {
+            lastCreatedCommands.Clear();
+            cumulativeHistory.Clear();
+        }
+
+        return result;
+    }
+
+    public bool SplitLastGeneratedObject(PartitionAxis axis)
+    {
+        GameObject root = GameObject.Find(sceneRootName);
+        if (root == null || root.transform.childCount == 0)
+            return CreateSplitPrimitive("cube", "white", axis);
+
+        GameObject source = root.transform.GetChild(root.transform.childCount - 1).gameObject;
+        if (!TryGetObjectBounds(source, out Bounds bounds))
+            return false;
+
+        Renderer renderer = source.GetComponentInChildren<Renderer>();
+        Material material = renderer != null ? renderer.sharedMaterial : CreateMaterial("white");
+        string sourceName = source.name;
+
+        source.transform.DOKill();
+        bool result = CreateSplitPiecesFromBounds(bounds, material, root.transform, sourceName, axis);
+        Destroy(source);
+        return result;
+    }
+
 
     /// <summary>
     /// Converts raw Gemini output into a list of validated DesignCommand objects.
@@ -1400,7 +1480,7 @@ public class GeometryManager : MonoBehaviour
         if (normalized == "intersect" || normalized == "intersection" || normalized == "kes" || normalized == "kesisim" || normalized == "kesisme") op = CSGOperationType.Intersection;
         if (normalized == "union" || normalized == "birlesme" || normalized == "birlestir" || normalized == "merge" || normalized == "merging") op = CSGOperationType.Union;
 
-        if (op == CSGOperationType.Intersection && TryCreateAabbIntersection(objA, objB, root.transform))
+        if (op == CSGOperationType.Intersection && TryCreateAabbIntersection(objA, objB, root.transform, allowAutoOverlap: true))
         {
             Debug.Log("[GeometryManager] AABB intersection result created.");
             return true;
@@ -1425,9 +1505,9 @@ public class GeometryManager : MonoBehaviour
         }
     }
 
-    private bool TryCreateAabbIntersection(GameObject objA, GameObject objB, Transform parent)
+    private bool TryCreateAabbIntersection(GameObject objA, GameObject objB, Transform parent, bool allowAutoOverlap)
     {
-        if (!TryPrepareIntersectionBounds(objA, objB, out Bounds aBounds, out Bounds bBounds))
+        if (!TryPrepareIntersectionBounds(objA, objB, out Bounds aBounds, out Bounds bBounds, allowAutoOverlap))
         {
             ShowError("[GeometryManager] Kesisim icin ortak hacim olusturulamadi.");
             return false;
@@ -1462,7 +1542,62 @@ public class GeometryManager : MonoBehaviour
         return true;
     }
 
-    private bool TryPrepareIntersectionBounds(GameObject objA, GameObject objB, out Bounds aBounds, out Bounds bBounds)
+    private bool CreateSplitPiecesFromBounds(Bounds bounds, Material material, Transform parent, string baseName, PartitionAxis axis)
+    {
+        Vector3 size = bounds.size;
+        if (size.x <= Mathf.Epsilon || size.y <= Mathf.Epsilon || size.z <= Mathf.Epsilon)
+            size = Vector3.one * 0.95f;
+
+        Vector3 halfSize = size;
+        Vector3 axisVector = Vector3.right;
+        float axisSize = size.x;
+
+        switch (axis)
+        {
+            case PartitionAxis.Y:
+                halfSize.y *= 0.5f;
+                axisVector = Vector3.up;
+                axisSize = size.y;
+                break;
+            case PartitionAxis.Z:
+                halfSize.z *= 0.5f;
+                axisVector = Vector3.forward;
+                axisSize = size.z;
+                break;
+            default:
+                halfSize.x *= 0.5f;
+                break;
+        }
+
+        float gap = Mathf.Max(DefaultPartitionGap, 0.04f);
+        float offset = axisSize * 0.25f + gap * 0.5f;
+
+        CreateSplitPiece(parent, $"{baseName}_Part_A", bounds.center, bounds.center - axisVector * offset, halfSize, material);
+        CreateSplitPiece(parent, $"{baseName}_Part_B", bounds.center, bounds.center + axisVector * offset, halfSize, material);
+
+        Debug.Log($"[GeometryManager] Split '{baseName}' into two separate root objects.");
+        return true;
+    }
+
+    private void CreateSplitPiece(Transform parent, string name, Vector3 startPosition, Vector3 targetPosition, Vector3 size, Material material)
+    {
+        GameObject piece = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        piece.name = name;
+        piece.transform.SetParent(parent, worldPositionStays: true);
+        piece.transform.position = startPosition;
+        piece.transform.localScale = size;
+
+        Renderer renderer = piece.GetComponent<Renderer>();
+        if (renderer != null && material != null)
+            renderer.sharedMaterial = material;
+
+        MakeGeneratedResultInteractable(piece);
+        piece.transform.DOMove(targetPosition, 0.45f)
+            .SetEase(Ease.OutCubic)
+            .SetLink(piece, LinkBehaviour.KillOnDestroy);
+    }
+
+    private bool TryPrepareIntersectionBounds(GameObject objA, GameObject objB, out Bounds aBounds, out Bounds bBounds, bool allowAutoOverlap)
     {
         bool hasA = TryGetObjectBounds(objA, out aBounds);
         bool hasB = TryGetObjectBounds(objB, out bBounds);
@@ -1471,6 +1606,9 @@ public class GeometryManager : MonoBehaviour
 
         if (WongMathUtility.CalculateIntersectionVolume(aBounds, bBounds) > Mathf.Epsilon)
             return true;
+
+        if (!allowAutoOverlap)
+            return false;
 
         float xOffset = Mathf.Max(0.02f, Mathf.Min(aBounds.extents.x, bBounds.extents.x) * 0.5f);
         Vector3 desiredCenter = aBounds.center + Vector3.right * xOffset;
